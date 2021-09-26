@@ -1,20 +1,33 @@
 # Exercise 4: Image translation
 
-
 ## Get the terminal ready.
 If the `(base)` prefix is not present in front of the shell prompt, you need to initialize conda and restart the terminal:
 ```
 conda init bash
 ```
 
-## Copy data and setup environment.
-Open the terminal and run the shell script that fetches the data and the microDL repository.
+## Fetch the readme and shell script from this repo.
+
+```
+git clone https://github.com/dlmbl/04_image_translation.git
+cd 04_image_translation
+```
+
+
+## Setup data and environment.
+Open the terminal and run the shell script that setups the data and the microDL repository. You are welcome to examine the script to understand the steps.
 ```
 bash setup_data_environment.sh 
 ```
+
+## activate the new conda environment.
+```
+conda activate micro_dl
+```
+
 ## If working on a virtual desktop (e.g., NoMachine)
 
-Launh jupyter lab from the terminal within your session:
+Launch jupyter lab from the terminal within your session:
 ```
 jupyter lab
 ```
