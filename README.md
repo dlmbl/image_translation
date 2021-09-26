@@ -10,7 +10,7 @@ conda init bash
 ## Copy data and setup environment.
 Open the terminal and run the shell script that fetches the data and the microDL repository.
 ```
-bash setup\_data\_environment.sh 
+bash setup_data_environment.sh 
 ```
 ## If working on a virtual desktop (e.g., NoMachine)
 
