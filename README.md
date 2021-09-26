@@ -2,12 +2,17 @@
 
 ## Setup
 
-Copy the data to the home directory:
+If the `(base)` prefix is not present in front of the shell prompt, you need to initialize conda and restart the terminal:
+```
+conda init bash
+```
+
+Open the terminal and copy the data to the home directory:
 
 ```
-mkdir 04_image_translation
-cp -r /mnt/efs/woods_hole/04_image_translation/data ~/04_image_translation
+cp -r /mnt/efs/woods_hole/04_image_translation_data ~
 ```
+
 
 Download `microDL` repository:
 
@@ -35,10 +40,16 @@ Add microDL to python path:
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 ```
 
-Next, launch a jupyter notebook server, if you're running the notebook from a server: 
+
+**If working on a virtual desktop (e.g., NoMachine)**, launh a jupyter lab from the terminal within your session:
+```
+jupyter lab
+```
+
+**If working on a terminal**, launch a jupyter lab server that you can connect from your browser: 
 
 ```
-jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --no-browser
+jupyter lab --ip=0.0.0.0 --port=8888 --no-browser
 ```
 
 Then you can access your notebooks in your browser at:
@@ -46,6 +57,9 @@ Then you can access your notebooks in your browser at:
 ```
 http://<your server name>:8888
 ```
+Enter the token jupyter generated when you launched the notebook.
 
-Enter the token jupyter generated when you launched the notebook, open the notebook under /microDL/notebook/, 
-and continue with the instructions in the notebook.
+Open the notebook under /microDL/notebook/, and continue with the instructions in the notebook.
+
+
+
