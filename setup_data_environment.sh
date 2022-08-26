@@ -13,9 +13,9 @@ tar -xzvf data.tar.gz
 # Clone `microDL` repository, and checkout the dl_mbl_2021 branch.
 
 echo -e "setup the microDL repo:\n"
-git clone https://github.com/czbiohub/microDL.git
+git clone https://github.com/mehta-lab/microDL.git
 cd microDL
-git checkout dl_mbl_2021
+git checkout tags/v1.0.0-rc1
 
 # create conda environment and add the module to python path.
 
