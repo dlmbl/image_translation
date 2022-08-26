@@ -28,7 +28,7 @@ bash setup_environment.sh
 
 ## activate the new conda environment.
 ```
-conda activate microdl
+conda activate microdl2022
 ```
 
 ## If working on a virtual desktop (e.g., NoMachine)
