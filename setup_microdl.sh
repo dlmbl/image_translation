@@ -1,6 +1,6 @@
 #!bin/bash
 
-# Clone `microDL` repository, and checkout the dl_mbl_2021 branch.
+# Clone `microDL` repository, and checkout the release tested with this notebook.
 
 echo -e "setup the microDL repo:\n"
 git clone https://github.com/mehta-lab/microDL.git

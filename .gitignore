@@ -2,4 +2,4 @@ data*
 microDL*
 *.ipynb*
 *microdl_patches*
-*models*
+microdl_model
