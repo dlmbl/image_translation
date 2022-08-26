@@ -14,15 +14,21 @@ cd 04_image_translation
 ```
 
 
-## Setup data and environment.
-Open the terminal and run the shell script that setups the data and the microDL repository. You are welcome to examine the script to understand the steps.
+## Download data.
+Open the terminal and run the shell script that downloads the data. You are welcome to examine the script to understand the steps.
 ```
-bash setup_data_environment.sh 
+bash download_data.sh 
+```
+
+## Setup environment.
+Open the terminal and run the shell script that setups the microDL repository and conda environment. You are welcome to examine the script to understand the steps.
+```
+bash setup_environment.sh
 ```
 
 ## activate the new conda environment.
 ```
-conda activate micro_dl
+conda activate microdl
 ```
 
 ## If working on a virtual desktop (e.g., NoMachine)
