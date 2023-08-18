@@ -22,10 +22,10 @@ CODE_DIR=$(pwd)
 # Create data directory
 mkdir -p ~/data/04_image_translation
 cd ~/data/04_image_translation
+wget https://dl-at-mbl-2023-data.s3.us-east-2.amazonaws.com/DLMBL2023_image_translation_data.tar.gz
+tar -xzf DLMBL2023_image_translation_data.tar.gz 
 
 # # Download and unzip the data
-# wget https://data.broadinstitute.org/bbbc/BBBC048/BBBC048v1.zip
-# unzip BBBC048v1.zip
 touch here_lives_the_data
 
 # Go back to the code directory
