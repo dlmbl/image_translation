@@ -58,7 +58,7 @@ Run <code>open_ome_zarr?</code> in a cell to see the docstring.
 
 # %%
 # set dataset path here
-data_path = "/hpc/projects/comp.micro/virtual_staining/datasets/dlmbl/HEK_nuclei_membrane_pyramid.zarr"
+data_path = "~/data/04_image_translation/HEK_nuclei_membrane_pyramid.zarr"
 
 dataset = open_ome_zarr(data_path)
 
