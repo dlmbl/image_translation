@@ -12,7 +12,7 @@ mamba install -y ipykernel --name 04_image_translation
 # Find path to the environment - mamba activate doesn't work from within shell scripts.
 ENV_PATH=$(conda info --envs | grep 04_image_translation | awk '{print $2}')
 # install viscy and its dependencies in the environment using pip.
-$ENV_PATH/bin/pip install "viscy[metrics] @ git+https://github.com/mehta-lab/viscy.git"
+$ENV_PATH/bin/pip install "viscy[metrics] @ git+https://github.com/mehta-lab/viscy.git@dlmbl2023"
 
 
 # Store the code directory path.
