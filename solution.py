@@ -99,7 +99,8 @@ log_dir.mkdir(parents=True, exist_ok=True)
 
 # fmt: off
 %reload_ext tensorboard
-%tensorboard --logdir {log_dir} --host ec2-3-143-251-15.us-east-2.compute.amazonaws.com 
+
+# %tensorboard --logdir {log_dir} --host ec2-3-143-251-15.us-east-2.compute.amazonaws.com 
 # change the hostname to your amazon aws instance. 
 # fmt: on
 
@@ -323,9 +324,7 @@ We setup a fresh data module and instantiate the trainer class.
 """
 
 # %%
-
-# The entire training loop is contained in this cell.
-
+# Create a 2D UNet. 
 GPU_ID = 0
 BATCH_SIZE = 10
 YX_PATCH_SIZE = (512, 512)
@@ -353,28 +352,12 @@ phase2fluor_model = VSUNet(
 
 
 
-# %%
-
-# PyTorch uses dynamic graphs under the hood. The graphs are constructed on the fly. This is in contrast to TensorFlow, where the graph is constructed before the training loop and remains static. In other words, the graph of the network can change with every forward pass. Therefore, we need to supply an input tensor to construct the graph. The input tensor can be a random tensor of the correct shape and type. We can also supply a real image from the dataset. The latter is more useful for debugging.
-
-# visualize graph of phase2fluor model as image.
-model_graph_phase2fluor = torchview.draw_graph(
-    phase2fluor_model,
-    phase2fluor_data.train_dataset[0]["source"],
-    depth=2,  # adjust depth to zoom in.
-    device="cpu",
-)
-# Print the image of the model.
-model_graph_phase2fluor.visual_graph
-
 # %% [markdown]
 """
 Instantiate data module and trainer, test that we are setup to launch training.
 """ 
 # %% 
-
-
-# Reinitialize the data module.
+# Setup the data module.
 phase2fluor_data = HCSDataModule(
     data_path,
     source_channel="Phase",
@@ -393,6 +376,22 @@ trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID], fast_dev_run=True)
 
 # trainer class takes the model and the data module as inputs.
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_data)
+
+
+# %%
+
+# PyTorch uses dynamic graphs under the hood. The graphs are constructed on the fly. This is in contrast to TensorFlow, where the graph is constructed before the training loop and remains static. In other words, the graph of the network can change with every forward pass. Therefore, we need to supply an input tensor to construct the graph. The input tensor can be a random tensor of the correct shape and type. We can also supply a real image from the dataset. The latter is more useful for debugging.
+
+# visualize graph of phase2fluor model as image.
+model_graph_phase2fluor = torchview.draw_graph(
+    phase2fluor_model,
+    phase2fluor_data.train_dataset[0]["source"],
+    depth=2,  # adjust depth to zoom in.
+    device="cpu",
+)
+# Print the image of the model.
+model_graph_phase2fluor.visual_graph
+
 # %% [markdown]
 """
 <div class="alert alert-info">
@@ -459,51 +458,6 @@ We now look at some metrics of performance of previous model. We typically evalu
 You should also look at the validation samples on tensorboard (hint: the experimental data in nuclei channel is imperfect.)
 
 """
-# %% 
-
-def compute_plot_test_metrics(test_data_path, model_version, save_dir, ckpt_path):
-    """
-    Computes and plots the test metrics for the given test data and model checkpoint.
-
-    Args:
-        test_data_path (str): The path to the test data.
-        model_version (str): The version of the model.
-        save_dir (str): The directory to save the metrics and plots.
-        ckpt_path (str): The path to the model checkpoint.
-
-    Returns:
-        None
-    """
-    test_data = HCSDataModule(
-        test_data_path,
-        source_channel="Phase",
-        target_channel=["Nuclei", "Membrane"],
-        z_window_size=1,
-        batch_size=1,
-        num_workers=8,
-        architecture="2D",
-    )
-    test_data.setup("test")
-    trainer = VSTrainer(
-        accelerator="gpu",
-        devices=[GPU_ID],
-        logger=CSVLogger(save_dir=save_dir, version=model_version),
-    )
-    trainer.test(
-        phase2fluor_model,
-        datamodule=test_data,
-        ckpt_path=ckpt_path,
-    )
-    # read metrics and plot
-    metrics = pd.read_csv(Path(save_dir, "lightning_logs", model_version, "metrics.csv"))
-    metrics.boxplot(
-        column=[
-            "test_metrics/r2_step",
-            "test_metrics/pearson_step",
-            "test_metrics/SSIM_step",
-        ],
-        rot=30,
-    )
 
 # %%
 
@@ -511,13 +465,43 @@ def compute_plot_test_metrics(test_data_path, model_version, save_dir, ckpt_path
 test_data_path = Path(
     "~/data/04_image_translation/HEK_nuclei_membrane_test.zarr"
 ).expanduser()
-model_version = "phase2fluor"
+model_type = "phase2fluor"
 save_dir = Path(log_dir, "test")
-ckpt_path = Path(log_dir, r"phase2fluor/version_0/checkpoints/epoch=2-step=72.ckpt")
+ckpt_path = Path(log_dir, model_type, r"version_0/checkpoints/epoch=2-step=72.ckpt")
 # prefix the string with 'r' to avoid the need for escape characters.
 ### END TODO
-compute_plot_test_metrics(test_data_path, model_version, save_dir, ckpt_path)
 
+test_data = HCSDataModule(
+    test_data_path,
+    source_channel="Phase",
+    target_channel=["Nuclei", "Membrane"],
+    z_window_size=1,
+    batch_size=1,
+    num_workers=8,
+    architecture="2D",
+)
+test_data.setup("test")
+
+trainer = VSTrainer(
+    accelerator="gpu",
+    devices=[0],
+    logger=CSVLogger(save_dir=save_dir, version=model_type),
+)
+trainer.test(
+    phase2fluor_model,
+    datamodule=test_data,
+    ckpt_path=ckpt_path,
+)
+# read metrics and plot
+metrics = pd.read_csv(Path(save_dir, "lightning_logs", model_type, "metrics.csv"))
+metrics.boxplot(
+    column=[
+        "test_metrics/r2_step",
+        "test_metrics/pearson_step",
+        "test_metrics/SSIM_step",
+    ],
+    rot=30,
+)
 
 
 # %% [markdown]
