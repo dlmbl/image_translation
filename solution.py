@@ -75,6 +75,7 @@ import torchvision
 from iohub import open_ome_zarr
 from lightning.pytorch import seed_everything
 from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
+from skimage import metrics # for metrics.
 
 # pytorch lightning wrapper for Tensorboard.
 from torch.utils.tensorboard import SummaryWriter  # for logging to tensorboard
@@ -99,8 +100,7 @@ log_dir.mkdir(parents=True, exist_ok=True)
 
 # fmt: off
 %reload_ext tensorboard
-
-# %tensorboard --logdir {log_dir} --host ec2-3-143-251-15.us-east-2.compute.amazonaws.com 
+%tensorboard --logdir {log_dir}
 # change the hostname to your amazon aws instance. 
 # fmt: on
 
@@ -346,7 +346,7 @@ phase2fluor_model = VSUNet(
     batch_size=BATCH_SIZE,
     loss_function=torch.nn.functional.l1_loss,
     schedule="WarmupCosine",
-    log_num_samples=10,  # Number of samples from each batch to log to tensorboard.
+    log_num_samples=5,  # Number of samples from each batch to log to tensorboard.
     example_input_yx_shape=YX_PATCH_SIZE,
 )
 
@@ -451,9 +451,8 @@ Task 2.1 Compute metrics for phase2fluor model.
 # %% [markdown]
 """
 We now look at some metrics of performance of previous model. We typically evaluate the model performance on a held out test data. We will use the following metrics to evaluate the accuracy of regression of the model:
-- [Coefficient of determination](https://en.wikipedia.org/wiki/Coefficient_of_determination): $R^2$ 
 - [Person Correlation](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient).
-- [Structural similarity](https://en.wikipedia.org/wiki/Structural_similarity) (SSIM):
+- [Structural similarity](https://en.wikipedia.org/wiki/Structural_similarity) (SSIM).
 
 You should also look at the validation samples on tensorboard (hint: the experimental data in nuclei channel is imperfect.)
 
@@ -463,9 +462,6 @@ You should also look at the validation samples on tensorboard (hint: the experim
 test_data_path = Path(
     "~/data/04_image_translation/HEK_nuclei_membrane_test.zarr"
 ).expanduser()
-model_type = "phase2fluor"
-save_dir = Path(log_dir, "test")
-ckpt_path = Path(log_dir, model_type, r"version_0/checkpoints/epoch=2-step=72.ckpt")
 
 test_data = HCSDataModule(
     test_data_path,
@@ -478,54 +474,48 @@ test_data = HCSDataModule(
 )
 test_data.setup("test")
 
-for i in range(len(test_data.test_dataset)):
-    phase_image = test_data.test_dataset[i]["source"]
-    target_image = test_data.test_dataset[i]["target"]
-    predicted_image = phase2fluor_model(phase_image.unsqueeze(0))
-    print('predicted_image.shape', predicted_image.shape)
-# %%
+test_metrics = pd.DataFrame(columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"])
 
-# TODO: set following parameters, specifically path to checkpoint, and log the metrics.
-test_data_path = Path(
-    "~/data/04_image_translation/HEK_nuclei_membrane_test.zarr"
-).expanduser()
-model_type = "phase2fluor"
-save_dir = Path(log_dir, "test")
-ckpt_path = Path(log_dir, model_type, r"version_0/checkpoints/epoch=2-step=72.ckpt")
-# prefix the string with 'r' to avoid the need for escape characters.
-### END TODO
+def min_max_scale(input):
+    return (input - np.min(input)) / (np.max(input) - np.min(input))
 
-test_data = HCSDataModule(
-    test_data_path,
-    source_channel="Phase",
-    target_channel=["Nuclei", "Membrane"],
-    z_window_size=1,
-    batch_size=1,
-    num_workers=8,
-    architecture="2D",
-)
-test_data.setup("test")
+for i, sample in enumerate(test_data.test_dataloader()):
+    phase_image = sample["source"]
+    with torch.inference_mode(): # turn off gradient computation.
+        predicted_image = phase2fluor_model(phase_image)
+        
+    target_image = sample["target"].cpu().numpy().squeeze(0) # Squeezing batch dimension.
+    predicted_image = predicted_image.cpu().numpy().squeeze(0)
+    phase_image = phase_image.cpu().numpy().squeeze(0)
+    target_mem = min_max_scale(target_image[1, 0, :, :]) 
+    target_nuc = min_max_scale(target_image[0, 0, :, :])
+    # slicing channel dimension, squeezing z-dimension.
+    predicted_mem = min_max_scale(predicted_image[1, :, :, :].squeeze(0)) 
+    predicted_nuc = min_max_scale(predicted_image[0, :, :, :].squeeze(0))
+    
+    
+    # Compute SSIM and pearson correlation.
+    ssim_nuc = metrics.structural_similarity(target_nuc, predicted_nuc, data_range=1) 
+    ssim_mem = metrics.structural_similarity(target_mem, predicted_mem, data_range=1)
+    pearson_nuc = np.corrcoef(target_nuc.flatten(), predicted_nuc.flatten())[0, 1]
+    pearson_mem = np.corrcoef(target_mem.flatten(), predicted_mem.flatten())[0, 1]
+    
+    test_metrics.loc[i] = {
+            "pearson_nuc": pearson_nuc,
+            "SSIM_nuc": ssim_nuc,
+            "pearson_mem": pearson_mem,
+            "SSIM_mem": ssim_mem
+        }
 
-trainer = VSTrainer(
-    accelerator="gpu",
-    devices=[0],
-    logger=CSVLogger(save_dir=save_dir, version=model_type),
-)
-trainer.test(
-    phase2fluor_model,
-    datamodule=test_data,
-    ckpt_path=ckpt_path,
-)
-# read metrics and plot
-metrics = pd.read_csv(Path(save_dir, "lightning_logs", model_type, "metrics.csv"))
-metrics.boxplot(
+test_metrics.boxplot(
     column=[
-        "test_metrics/r2_step",
-        "test_metrics/pearson_step",
-        "test_metrics/SSIM_step",
+         "pearson_nuc",
+        "SSIM_nuc",
+        "pearson_mem",
+        "SSIM_mem"
     ],
     rot=30,
-)
+)    
 
 
 # %% [markdown]
@@ -579,7 +569,7 @@ fluor2phase_model = VSUNet(
     batch_size=BATCH_SIZE,
     loss_function=torch.nn.functional.mse_loss,
     schedule="WarmupCosine",
-    log_num_samples=10,
+    log_num_samples=5,
     example_input_yx_shape=YX_PATCH_SIZE,
 )
 
@@ -629,11 +619,15 @@ Now that you have trained two models, let's think about the following questions:
 # Part 3: Tune the models.
 --------------------------------------------------
 
-Learning goals:
+Learning goals: Understand how data, model capacity, and training parameters control the performance of the model. Your goal is to try to underfit or overfit the model.
 
-- Tweak model hyperparameters, such as number of filters at each depth.
-- Adjust learning rate to improve performance.
+Pick a model (phase2fluor or fluor2phase) and find optimal hyperparameters such that the model just overfits the data. Adjust following hyperparameters:
+    - Number of filters at each stage (width of the model).
+    - Number of stages (depth of the model).
+    - Dropout rate.
+    - Learning rate.
 """
+
 
 # %%
 # %%
@@ -668,7 +662,7 @@ phase2fluor_wider_model = VSUNet(
     batch_size=BATCH_SIZE,
     loss_function=torch.nn.functional.l1_loss,
     schedule="WarmupCosine",
-    log_num_samples=10,
+    log_num_samples=5,
     example_input_yx_shape=YX_PATCH_SIZE,
 )
 
@@ -710,7 +704,7 @@ phase2fluor_slow_model = VSUNet(
     # lower learning rate by 5 times
     lr=2e-4,
     schedule="WarmupCosine",
-    log_num_samples=10,
+    log_num_samples=5,
     example_input_yx_shape=YX_PATCH_SIZE,
 )
 
@@ -739,35 +733,3 @@ Congratulations! You have trained several image translation models now!
 Please document hyperparameters, snapshots of predictioons on validation set, and loss curves for your models in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z)
 </div>
 """
-
-# %% [markdown]
-"""
-# Bonus exercise: 3D image translation
---------------------------------------
-"""
-
-# %% [markdown]
-"""
-3D image translation can be done with 2D or 3D UNets, or the 2.5D UNet. While training the 2.5D and 3D UNets can take ~4 hours, it is possible to explore how the trained models perform on the test data. The 3D test data can be found at ``~/data/04_image_translation/HEK_nuclei_membrane_test_3D.zarr``. We provide you a checkpoint of a 2.5D UNet.
-"""
-# %% 
-
-### TODO ### 
-# Instantiate 2.5D and 3D phase2fluor models and visualize their graphs.
-
-# %% [solution]
-
-# %% 
-
-### TODO ### 
-# Predict 3D volumes with 2D UNet you have trained.
-# Look at XY, XZ, YZ slices.
-
-# %% 
-
-### TODO ### 
-# Predict 3D volumes with 2.5D UNet we supplied. Checkpoint can be found here.
-# Look at XY, XZ, YZ slices.
-
-# %% [solution]
-
