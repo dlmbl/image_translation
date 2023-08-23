@@ -459,6 +459,30 @@ You should also look at the validation samples on tensorboard (hint: the experim
 
 """
 
+# %% Compute metrics directly and plot here.
+test_data_path = Path(
+    "~/data/04_image_translation/HEK_nuclei_membrane_test.zarr"
+).expanduser()
+model_type = "phase2fluor"
+save_dir = Path(log_dir, "test")
+ckpt_path = Path(log_dir, model_type, r"version_0/checkpoints/epoch=2-step=72.ckpt")
+
+test_data = HCSDataModule(
+    test_data_path,
+    source_channel="Phase",
+    target_channel=["Nuclei", "Membrane"],
+    z_window_size=1,
+    batch_size=1,
+    num_workers=8,
+    architecture="2D",
+)
+test_data.setup("test")
+
+for i in range(len(test_data.test_dataset)):
+    phase_image = test_data.test_dataset[i]["source"]
+    target_image = test_data.test_dataset[i]["target"]
+    predicted_image = phase2fluor_model(phase_image.unsqueeze(0))
+    print('predicted_image.shape', predicted_image.shape)
 # %%
 
 # TODO: set following parameters, specifically path to checkpoint, and log the metrics.
