@@ -177,7 +177,7 @@ plt.tight_layout()
 
 # %% [markdown]
 """
-## Initialize data loaders and see the samples in tensorboard.
+## Explore the effects of augmentation on batch.
 
 <div class="alert alert-info">
 Task 1.2
@@ -195,7 +195,6 @@ The dataloader in `HCSDataModule` returns a batch of samples. A `batch` is a lis
 
 # %%
 # Define a function to write a batch to tensorboard log.
-
 
 def log_batch_tensorboard(batch, batchno, writer, card_name):
     """
@@ -318,11 +317,14 @@ writer.close()
 
 # %% [markdown]
 """
-##  Construct a 2D U-Net for image translation.
-See ``viscy.unet.networks.Unet2D.Unet2d`` for configuration details.
-We setup a fresh data module and instantiate the trainer class.
+## Train a 2D U-Net model to predict nuclei and membrane from phase.
 """
+# % [markdown]
+"""
+### Construct a 2D U-Net
+See ``viscy.unet.networks.Unet2D.Unet2d`` for configuration details.
 
+"""
 # %%
 # Create a 2D UNet.
 GPU_ID = 0
@@ -353,7 +355,7 @@ phase2fluor_model = VSUNet(
 
 # %% [markdown]
 """
-Instantiate data module and trainer, test that we are setup to launch training.
+### Instantiate data module and trainer, test that we are setup to launch training.
 """
 # %%
 # Setup the data module.
@@ -377,9 +379,14 @@ trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID], fast_dev_run=True)
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_data)
 
 
-# %%
+# %% [markdown]
+"""
+### View model graph.
 
-# PyTorch uses dynamic graphs under the hood. The graphs are constructed on the fly. This is in contrast to TensorFlow, where the graph is constructed before the training loop and remains static. In other words, the graph of the network can change with every forward pass. Therefore, we need to supply an input tensor to construct the graph. The input tensor can be a random tensor of the correct shape and type. We can also supply a real image from the dataset. The latter is more useful for debugging.
+PyTorch uses dynamic graphs under the hood. The graphs are constructed on the fly. This is in contrast to TensorFlow, where the graph is constructed before the training loop and remains static. In other words, the graph of the network can change with every forward pass. Therefore, we need to supply an input tensor to construct the graph. The input tensor can be a random tensor of the correct shape and type. We can also supply a real image from the dataset. The latter is more useful for debugging.
+
+"""
+
 
 # visualize graph of phase2fluor model as image.
 model_graph_phase2fluor = torchview.draw_graph(
@@ -620,10 +627,10 @@ Now that you have trained two models, let's think about the following questions:
 Learning goals: Understand how data, model capacity, and training parameters control the performance of the model. Your goal is to try to underfit or overfit the model.
 
 Pick a model (phase2fluor or fluor2phase) and find optimal hyperparameters such that the model just overfits the data. Adjust following hyperparameters:
-    - Number of filters at each stage (width of the model).
-    - Number of stages (depth of the model).
-    - Dropout rate.
-    - Learning rate.
+* Number of filters at each stage (width and depth of the model).
+* Dropout rate.
+* Turn on/off augmentation.
+* Learning rate.
 """
 
 
