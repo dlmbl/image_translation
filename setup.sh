@@ -8,7 +8,7 @@ mamba install -y ipykernel nbformat nbconvert black jupytext --name 04_image_tra
 # Specifying the environment explicitly.
 # mamba activate sometimes doesn't work from within shell scripts.
 
-# install viscy and its dependencies in the environment using pip.
+# install viscy and its dependenciex`s in the environment using pip.
 mkdir -p ~/code/
 cd ~/code/
 git clone https://github.com/mehta-lab/viscy.git
