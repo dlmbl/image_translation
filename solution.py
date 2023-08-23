@@ -318,9 +318,7 @@ writer.close()
 # %% [markdown]
 """
 ## Train a 2D U-Net model to predict nuclei and membrane from phase.
-"""
-# % [markdown]
-"""
+
 ### Construct a 2D U-Net
 See ``viscy.unet.networks.Unet2D.Unet2d`` for configuration details.
 
