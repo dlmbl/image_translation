@@ -74,9 +74,9 @@ import torchview
 import torchvision
 from iohub import open_ome_zarr
 from lightning.pytorch import seed_everything
-from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 
 # pytorch lightning wrapper for Tensorboard.
+from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 from torch.utils.tensorboard import SummaryWriter  # for logging to tensorboard
 
 # HCSDataModule makes it easy to load data during training.
@@ -84,6 +84,9 @@ from viscy.light.data import HCSDataModule
 
 # Trainer class and UNet.
 from viscy.light.engine import VSTrainer, VSUNet
+
+# Prediction writer callback
+from viscy.light.predict_writer import HCSPredictionWriter
 
 seed_everything(42, workers=True)
 
@@ -99,12 +102,12 @@ log_dir.mkdir(parents=True, exist_ok=True)
 
 # fmt: off
 %reload_ext tensorboard
-%tensorboard --logdir {log_dir} --host ec2-3-143-251-15.us-east-2.compute.amazonaws.com 
-# change the hostname to your amazon aws instance. 
+%tensorboard --logdir {log_dir} --host ec2-3-143-251-15.us-east-2.compute.amazonaws.com
+# change the hostname to your amazon aws instance.
 # fmt: on
 
 # %% [markdown]
-'''
+"""
 Above cell starts tensorboard within the notebook.
 
 <div class="alert alert-danger">
@@ -112,7 +115,7 @@ If you launched jupyter lab from ssh terminal, you do need the <code>--host &lt;
 
 You can also launch tensorboard in an independent tab by changing the `%` to `!`
 </div>
-'''
+"""
 
 # %% [markdown]
 """
@@ -146,7 +149,7 @@ print(f"Number of positions: {len(list(dataset.positions()))}")
 # Use the field and pyramid_level below to visualize data.
 row = 0
 col = 0
-field = 23 # TODO: Change this to explore data.
+field = 23  # TODO: Change this to explore data.
 
 # This dataset contains images at 3 resolutions.
 # '0' is the highest resolution
@@ -333,7 +336,6 @@ YX_PATCH_SIZE = (512, 512)
 
 # Dictionary that specifies key parameters of the model.
 phase2fluor_config = {
-    "architecture": "2D",
     "num_filters": [24, 48, 96, 192, 384],
     "in_channels": 1,
     "out_channels": 2,
@@ -343,6 +345,7 @@ phase2fluor_config = {
 }
 
 phase2fluor_model = VSUNet(
+    architecture="2D",
     model_config=phase2fluor_config.copy(),
     batch_size=BATCH_SIZE,
     loss_function=torch.nn.functional.l1_loss,
@@ -350,7 +353,6 @@ phase2fluor_model = VSUNet(
     log_num_samples=10,  # Number of samples from each batch to log to tensorboard.
     example_input_yx_shape=YX_PATCH_SIZE,
 )
-
 
 
 # %%
@@ -370,8 +372,8 @@ model_graph_phase2fluor.visual_graph
 # %% [markdown]
 """
 Instantiate data module and trainer, test that we are setup to launch training.
-""" 
-# %% 
+"""
+# %%
 
 
 # Reinitialize the data module.
@@ -408,7 +410,7 @@ Setup the training for ~50 epochs
 GPU_ID = 0
 n_samples = len(phase2fluor_data.train_dataset)
 steps_per_epoch = n_samples // BATCH_SIZE  # steps per epoch.
-n_epochs = 3 # Set this to 50 or the number of epochs you want to train for.
+n_epochs = 3  # Set this to 50 or the number of epochs you want to train for.
 
 trainer = VSTrainer(
     accelerator="gpu",
@@ -421,8 +423,8 @@ trainer = VSTrainer(
         # lightning trainer transparently saves logs and model checkpoints in this directory.
         name="phase2fluor",
         log_graph=True,
-        ),
-    )  
+    ),
+)
 # Launch training and check that loss and images are being logged on tensorboard.
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_data)
 
@@ -459,7 +461,8 @@ We now look at some metrics of performance of previous model. We typically evalu
 You should also look at the validation samples on tensorboard (hint: the experimental data in nuclei channel is imperfect.)
 
 """
-# %% 
+# %%
+
 
 def compute_plot_test_metrics(test_data_path, model_version, save_dir, ckpt_path):
     """
@@ -495,7 +498,9 @@ def compute_plot_test_metrics(test_data_path, model_version, save_dir, ckpt_path
         ckpt_path=ckpt_path,
     )
     # read metrics and plot
-    metrics = pd.read_csv(Path(save_dir, "lightning_logs", model_version, "metrics.csv"))
+    metrics = pd.read_csv(
+        Path(save_dir, "lightning_logs", model_version, "metrics.csv")
+    )
     metrics.boxplot(
         column=[
             "test_metrics/r2_step",
@@ -504,6 +509,7 @@ def compute_plot_test_metrics(test_data_path, model_version, save_dir, ckpt_path
         ],
         rot=30,
     )
+
 
 # %%
 
@@ -517,7 +523,6 @@ ckpt_path = Path(log_dir, r"phase2fluor/version_0/checkpoints/epoch=2-step=72.ck
 # prefix the string with 'r' to avoid the need for escape characters.
 ### END TODO
 compute_plot_test_metrics(test_data_path, model_version, save_dir, ckpt_path)
-
 
 
 # %% [markdown]
@@ -557,7 +562,6 @@ fluor2phase_data.setup("fit")
 
 # Dictionary that specifies key parameters of the model.
 fluor2phase_config = {
-    "architecture": "2D",
     "in_channels": 1,
     "out_channels": 1,
     "residual": True,
@@ -567,6 +571,7 @@ fluor2phase_config = {
 }
 
 fluor2phase_model = VSUNet(
+    architecture="2D",
     model_config=fluor2phase_config.copy(),
     batch_size=BATCH_SIZE,
     loss_function=torch.nn.functional.mse_loss,
@@ -575,19 +580,17 @@ fluor2phase_model = VSUNet(
     example_input_yx_shape=YX_PATCH_SIZE,
 )
 
-
-
 trainer = VSTrainer(
     accelerator="gpu",
     devices=[GPU_ID],
     max_epochs=n_epochs,
-    log_every_n_steps=steps_per_epoch//2,
-        logger=TensorBoardLogger(
+    log_every_n_steps=steps_per_epoch // 2,
+    logger=TensorBoardLogger(
         save_dir=log_dir,
         # lightning trainer transparently saves logs and model checkpoints in this directory.
         name="fluor2phase",
         log_graph=True,
-        ),
+    ),
 )
 trainer.fit(fluor2phase_model, datamodule=fluor2phase_data)
 
@@ -645,7 +648,6 @@ Learning goals:
 ##########################
 
 phase2fluor_wider_config = {
-    "architecture": "2D",
     # double the number of filters at each stage
     "num_filters": [48, 96, 192, 384, 768],
     "in_channels": 1,
@@ -656,6 +658,7 @@ phase2fluor_wider_config = {
 }
 
 phase2fluor_wider_model = VSUNet(
+    architecture="2D",
     model_config=phase2fluor_wider_config.copy(),
     batch_size=BATCH_SIZE,
     loss_function=torch.nn.functional.l1_loss,
@@ -675,7 +678,7 @@ trainer = VSTrainer(
         name="phase2fluor",
         version="wider",
         log_graph=True,
-        ),
+    ),
     fast_dev_run=True,
 )  # Set fast_dev_run to False to train the model.
 trainer.fit(phase2fluor_wider_model, datamodule=phase2fluor_data)
@@ -716,7 +719,7 @@ trainer = VSTrainer(
         name="phase2fluor",
         version="low_lr",
         log_graph=True,
-        ),
+    ),
     fast_dev_run=True,
 )
 trainer.fit(phase2fluor_slow_model, datamodule=phase2fluor_data)
@@ -728,7 +731,7 @@ trainer.fit(phase2fluor_slow_model, datamodule=phase2fluor_data)
 Checkpoint 3
 
 Congratulations! You have trained several image translation models now!
-Please document hyperparameters, snapshots of predictioons on validation set, and loss curves for your models in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z)
+Please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z)
 </div>
 """
 
@@ -742,24 +745,79 @@ Please document hyperparameters, snapshots of predictioons on validation set, an
 """
 3D image translation can be done with 2D or 3D UNets, or the 2.5D UNet. While training the 2.5D and 3D UNets can take ~4 hours, it is possible to explore how the trained models perform on the test data. The 3D test data can be found at ``~/data/04_image_translation/HEK_nuclei_membrane_test_3D.zarr``. We provide you a checkpoint of a 2.5D UNet.
 """
-# %% 
+# %%
 
-### TODO ### 
+### TODO ###
 # Instantiate 2.5D and 3D phase2fluor models and visualize their graphs.
 
 # %% [solution]
+# 2.5D U-Net
+phase2fluor_25d_config = {
+    "in_channels": 1,
+    "out_channels": 2,
+    "in_stack_depth": 5,
+    "residual": True,
+    "task": "reg",
+}
+phase2fluor_25d_model = VSUNet(
+    architecture="2.5D",
+    model_config=phase2fluor_25d_config.copy(),
+    example_input_yx_shape=YX_PATCH_SIZE,
+)
+model_graph_25d = torchview.draw_graph(
+    phase2fluor_25d_model,
+    phase2fluor_25d_model.example_input_array,
+    depth=2,
+    device="cpu",
+)
+model_graph_25d.visual_graph
 
-# %% 
-
-### TODO ### 
+# %%
+test_data_3d_path = test_data_path.with_name("HEK_nuclei_membrane_test_3d.zarr")
+### TODO ###
 # Predict 3D volumes with 2D UNet you have trained.
 # Look at XY, XZ, YZ slices.
 
-# %% 
+# %% [solution]
+test_data = HCSDataModule(
+    test_data_3d_path,
+    source_channel="Phase3D",
+    target_channel=["Nuclei", "Membrane"],
+    z_window_size=1,
+    batch_size=3,
+    num_workers=8,
+    architecture="2D",
+)
+writer = HCSPredictionWriter(output_store=log_dir / "2d_prediction.zarr")
+trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID], callbacks=writer)
+trainer.predict(
+    phase2fluor_model, test_data, return_predictions=False, ckpt_path=Path(...)
+)
 
-### TODO ### 
+# %%
+
+### TODO ###
 # Predict 3D volumes with 2.5D UNet we supplied. Checkpoint can be found here.
 # Look at XY, XZ, YZ slices.
 
 # %% [solution]
+test_data_25d = HCSDataModule(
+    test_data_3d_path,
+    source_channel="Phase3D",
+    target_channel=["Nuclei", "Membrane"],
+    z_window_size=5,
+    batch_size=1,
+    num_workers=8,
+    architecture="2.5D",
+)
+test_data_25d.setup("predict")
+writer = HCSPredictionWriter(output_store=log_dir / "25d_prediction.zarr")
+trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID], callbacks=writer)
+trainer.predict(
+    phase2fluor_25d_model,
+    test_data_25d,
+    return_predictions=False,
+    ckpt_path=test_data_path.with_name("25d.ckpt"),
+)
 
+# %%

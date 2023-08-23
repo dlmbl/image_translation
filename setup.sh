@@ -13,7 +13,7 @@ mkdir -p ~/code/
 cd ~/code/
 git clone https://github.com/mehta-lab/viscy.git
 cd viscy
-git checkout dlmbl2023
+git checkout 76c3b31618f09a4fb54b1b8d3dc2d1ab55a561eb
 # Find path to the environment - mamba activate doesn't work from within shell scripts.
 ENV_PATH=$(conda info --envs | grep 04_image_translation | awk '{print $NF}')
 $ENV_PATH/bin/pip install ."[metrics]"
