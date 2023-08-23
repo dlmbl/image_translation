@@ -75,7 +75,7 @@ import torchvision
 from iohub import open_ome_zarr
 from lightning.pytorch import seed_everything
 from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
-from skimage import metrics # for metrics.
+from skimage import metrics  # for metrics.
 
 # pytorch lightning wrapper for Tensorboard.
 from torch.utils.tensorboard import SummaryWriter  # for logging to tensorboard
@@ -101,11 +101,11 @@ log_dir.mkdir(parents=True, exist_ok=True)
 # fmt: off
 %reload_ext tensorboard
 %tensorboard --logdir {log_dir}
-# change the hostname to your amazon aws instance. 
+# change the hostname to your amazon aws instance.
 # fmt: on
 
 # %% [markdown]
-'''
+"""
 Above cell starts tensorboard within the notebook.
 
 <div class="alert alert-danger">
@@ -113,7 +113,7 @@ If you launched jupyter lab from ssh terminal, you do need the <code>--host &lt;
 
 You can also launch tensorboard in an independent tab by changing the `%` to `!`
 </div>
-'''
+"""
 
 # %% [markdown]
 """
@@ -147,7 +147,7 @@ print(f"Number of positions: {len(list(dataset.positions()))}")
 # Use the field and pyramid_level below to visualize data.
 row = 0
 col = 0
-field = 23 # TODO: Change this to explore data.
+field = 23  # TODO: Change this to explore data.
 
 # This dataset contains images at 3 resolutions.
 # '0' is the highest resolution
@@ -324,7 +324,7 @@ We setup a fresh data module and instantiate the trainer class.
 """
 
 # %%
-# Create a 2D UNet. 
+# Create a 2D UNet.
 GPU_ID = 0
 BATCH_SIZE = 10
 YX_PATCH_SIZE = (512, 512)
@@ -351,12 +351,11 @@ phase2fluor_model = VSUNet(
 )
 
 
-
 # %% [markdown]
 """
 Instantiate data module and trainer, test that we are setup to launch training.
-""" 
-# %% 
+"""
+# %%
 # Setup the data module.
 phase2fluor_data = HCSDataModule(
     data_path,
@@ -407,7 +406,7 @@ Setup the training for ~50 epochs
 GPU_ID = 0
 n_samples = len(phase2fluor_data.train_dataset)
 steps_per_epoch = n_samples // BATCH_SIZE  # steps per epoch.
-n_epochs = 3 # Set this to 50 or the number of epochs you want to train for.
+n_epochs = 3  # Set this to 50 or the number of epochs you want to train for.
 
 trainer = VSTrainer(
     accelerator="gpu",
@@ -420,8 +419,8 @@ trainer = VSTrainer(
         # lightning trainer transparently saves logs and model checkpoints in this directory.
         name="phase2fluor",
         log_graph=True,
-        ),
-    )  
+    ),
+)
 # Launch training and check that loss and images are being logged on tensorboard.
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_data)
 
@@ -474,48 +473,48 @@ test_data = HCSDataModule(
 )
 test_data.setup("test")
 
-test_metrics = pd.DataFrame(columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"])
+test_metrics = pd.DataFrame(
+    columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
+)
+
 
 def min_max_scale(input):
     return (input - np.min(input)) / (np.max(input) - np.min(input))
 
+
 for i, sample in enumerate(test_data.test_dataloader()):
     phase_image = sample["source"]
-    with torch.inference_mode(): # turn off gradient computation.
+    with torch.inference_mode():  # turn off gradient computation.
         predicted_image = phase2fluor_model(phase_image)
-        
-    target_image = sample["target"].cpu().numpy().squeeze(0) # Squeezing batch dimension.
+
+    target_image = (
+        sample["target"].cpu().numpy().squeeze(0)
+    )  # Squeezing batch dimension.
     predicted_image = predicted_image.cpu().numpy().squeeze(0)
     phase_image = phase_image.cpu().numpy().squeeze(0)
-    target_mem = min_max_scale(target_image[1, 0, :, :]) 
+    target_mem = min_max_scale(target_image[1, 0, :, :])
     target_nuc = min_max_scale(target_image[0, 0, :, :])
     # slicing channel dimension, squeezing z-dimension.
-    predicted_mem = min_max_scale(predicted_image[1, :, :, :].squeeze(0)) 
+    predicted_mem = min_max_scale(predicted_image[1, :, :, :].squeeze(0))
     predicted_nuc = min_max_scale(predicted_image[0, :, :, :].squeeze(0))
-    
-    
+
     # Compute SSIM and pearson correlation.
-    ssim_nuc = metrics.structural_similarity(target_nuc, predicted_nuc, data_range=1) 
+    ssim_nuc = metrics.structural_similarity(target_nuc, predicted_nuc, data_range=1)
     ssim_mem = metrics.structural_similarity(target_mem, predicted_mem, data_range=1)
     pearson_nuc = np.corrcoef(target_nuc.flatten(), predicted_nuc.flatten())[0, 1]
     pearson_mem = np.corrcoef(target_mem.flatten(), predicted_mem.flatten())[0, 1]
-    
+
     test_metrics.loc[i] = {
-            "pearson_nuc": pearson_nuc,
-            "SSIM_nuc": ssim_nuc,
-            "pearson_mem": pearson_mem,
-            "SSIM_mem": ssim_mem
-        }
+        "pearson_nuc": pearson_nuc,
+        "SSIM_nuc": ssim_nuc,
+        "pearson_mem": pearson_mem,
+        "SSIM_mem": ssim_mem,
+    }
 
 test_metrics.boxplot(
-    column=[
-         "pearson_nuc",
-        "SSIM_nuc",
-        "pearson_mem",
-        "SSIM_mem"
-    ],
+    column=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"],
     rot=30,
-)    
+)
 
 
 # %% [markdown]
@@ -574,18 +573,17 @@ fluor2phase_model = VSUNet(
 )
 
 
-
 trainer = VSTrainer(
     accelerator="gpu",
     devices=[GPU_ID],
     max_epochs=n_epochs,
-    log_every_n_steps=steps_per_epoch//2,
-        logger=TensorBoardLogger(
+    log_every_n_steps=steps_per_epoch // 2,
+    logger=TensorBoardLogger(
         save_dir=log_dir,
         # lightning trainer transparently saves logs and model checkpoints in this directory.
         name="fluor2phase",
         log_graph=True,
-        ),
+    ),
 )
 trainer.fit(fluor2phase_model, datamodule=fluor2phase_data)
 
@@ -677,7 +675,7 @@ trainer = VSTrainer(
         name="phase2fluor",
         version="wider",
         log_graph=True,
-        ),
+    ),
     fast_dev_run=True,
 )  # Set fast_dev_run to False to train the model.
 trainer.fit(phase2fluor_wider_model, datamodule=phase2fluor_data)
@@ -718,7 +716,7 @@ trainer = VSTrainer(
         name="phase2fluor",
         version="low_lr",
         log_graph=True,
-        ),
+    ),
     fast_dev_run=True,
 )
 trainer.fit(phase2fluor_slow_model, datamodule=phase2fluor_data)
