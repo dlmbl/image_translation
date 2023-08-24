@@ -77,9 +77,6 @@ from iohub import open_ome_zarr
 from lightning.pytorch import seed_everything
 from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 from skimage import metrics  # for metrics.
-from ipywidgets import interact, widgets
-from IPython.display import display
-from ipywidgets import Button, Layout
 
 # %% Imports and paths
 # pytorch lightning wrapper for Tensorboard.
@@ -105,18 +102,18 @@ log_dir.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown] tags=[]
 '''
-Below cell starts tensorboard within the notebook.
+The next cell starts tensorboard within the notebook.
 
 <div class="alert alert-danger">
-If you launched jupyter lab from ssh terminal, you do need the <code>--host &lt;your-server-name&gt;</code> flag above. <code>&lt;your-server-name&gt;</code> is the address of your compute node that ends in amazonaws.com.
+If you launched jupyter lab from ssh terminal, add <code>--host &lt;your-server-name&gt;</code> to the tensorboard command below. <code>&lt;your-server-name&gt;</code> is the address of your compute node that ends in amazonaws.com.
 
-You can also launch tensorboard in an independent tab by changing the `%` to `!`
+You can also launch tensorboard in an independent tab (instead of in the notebook) by changing the `%` to `!`
 </div>
 '''
 
 # %% Imports and paths tags=[]
 %reload_ext tensorboard
-%tensorboard --logdir {log_dir} --host ec2-18-188-180-213.us-east-2.compute.amazonaws.com
+%tensorboard --logdir {log_dir} 
 
 # %% [markdown]
 """
@@ -468,7 +465,7 @@ Start training by running the following cell. Check the new logs on the tensorbo
 GPU_ID = 0
 n_samples = len(phase2fluor_data.train_dataset)
 steps_per_epoch = n_samples // BATCH_SIZE  # steps per epoch.
-n_epochs = 5 # Set this to 50 or the number of epochs you want to train for.
+n_epochs = 50 # Set this to 50 or the number of epochs you want to train for.
 
 trainer = VSTrainer(
     accelerator="gpu",
@@ -734,7 +731,7 @@ test_data = HCSDataModule(
 test_data.setup("test")
 
 test_metrics = pd.DataFrame(
-    columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
+    columns=["pearson_phase", "SSIM_phase"]
 )
 
 
@@ -926,11 +923,3 @@ Congratulations! You have trained several image translation models now!
 Please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models and add the final perforance in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z). We'll discuss our combined results as a group.
 </div>
 """
-
-# %% tags=[]
-
-# %%
-
-# %%
-
-# %%
