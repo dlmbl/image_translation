@@ -15,16 +15,17 @@ VisCy evolved from our previous work on virtual staining of cellular components 
 [Guo et al. (2020) Revealing architectural order with quantitative label-free imaging and deep learning
 . eLife](https://elifesciences.org/articles/55502).
 
-VisCy exploits recent advances in the data and metadata formats ([OME-zarr](https://www.nature.com/articles/s41592-021-01326-w)) and DL frameworks, [PyTorch Lightning](https://lightning.ai/) and [MONAI](https://monai.io/). Our previous pipeline, [microDL](https://github.com/mehta-lab/microDL), is deprecated and is now a public archive.
-
+VisCy exploits recent advances in the data and metadata formats ([OME-zarr](https://www.nature.com/articles/s41592-021-01326-w)) and DL frameworks, [PyTorch Lightning](https://lightning.ai/) and [MONAI](https://monai.io/). 
 """
 
 # %% [markdown]
 """
 Today, we will train a 2D image translation model using a 2D U-Net with residual connections. We will use a dataset of 301 fields of view (FOVs) of Human Embryonic Kidney (HEK) cells, each FOV has 3 channels (phase, membrane, and nuclei). The cells were labeled with CRISPR editing. Intrestingly, not all cells during this experiment were labeled due to the stochastic nature of CRISPR editing. In such situations, virtual staining rescues missing labels.
 ![HEK](https://github.com/mehta-lab/VisCy/blob/dlmbl2023/docs/figures/phase_to_nuclei_membrane.svg?raw=true)
-
-<div class="alert alert-info">
+"""
+# %% [markdown]
+"""
+<div class="alert alert-warning">
 The exercise is organized in 3 parts.
 
 * **Part 1** - Explore the data using tensorboard. Launch the training before lunch.
@@ -32,7 +33,9 @@ The exercise is organized in 3 parts.
 * **Part 2** - Evaluate the training with tensorboard. Train another model.
 * **Part 3** - Tune the models to improve performance.
 </div>
-
+"""
+# %% [markdown]
+"""
 📖 As you work through parts 2 and 3, please share the layouts of your models (output of torchview) and their performance with everyone via [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z) 📖.
 
 
@@ -40,14 +43,14 @@ Our guesstimate is that each of the three parts will take ~1.5 hours. A reasonab
 We will discuss your observations on google doc after checkpoints 2 and 3.
 
 The focus of the exercise is on understanding information content of the data, how to train and evaluate 2D image translation model, and explore some hyperparameters of the model. If you complete this exercise and have time to spare, try the bonus exercise on 3D image translation.
-
-There are a few coding tasks sprinkled in parts 1 and 2, but part 3 is where you start writing and debugging code in the earnest. Before you start,
-
+"""
+# %% [markdown]
+"""
 <div class="alert alert-danger">
-Set your python kernel to <span style="color:black;">04-image-translation</span>
+Set your python kernel to <span style="color:black;">04_image_translation</span>
 </div>
 """
-# %% [markdown] <a id='1_phase2fluor'></a>
+# %% <a [markdown] id='1_phase2fluor'></a>
 """
 # Part 1: Log training data to tensorboard, start training a model.
 ---------
@@ -59,11 +62,9 @@ Learning goals:
 - Log some patches to tensorboard.
 - Initialize a 2D U-Net model for virtual staining
 - Start training the model to predict nuclei and membrane from phase.
-
 """
 
 # %% Imports and paths
-
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -76,7 +77,11 @@ from iohub import open_ome_zarr
 from lightning.pytorch import seed_everything
 from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 from skimage import metrics  # for metrics.
+from ipywidgets import interact, widgets
+from IPython.display import display
+from ipywidgets import Button, Layout
 
+# %% Imports and paths
 # pytorch lightning wrapper for Tensorboard.
 from torch.utils.tensorboard import SummaryWriter  # for logging to tensorboard
 
@@ -98,32 +103,24 @@ log_dir = Path("~/data/04_image_translation/logs/").expanduser()
 # Create log directory if needed, and launch tensorboard
 log_dir.mkdir(parents=True, exist_ok=True)
 
-# fmt: off
-%reload_ext tensorboard
-%tensorboard --logdir {log_dir}
-# change the hostname to your amazon aws instance.
-# fmt: on
-
-# %% [markdown]
-"""
-Above cell starts tensorboard within the notebook.
+# %% [markdown] tags=[]
+'''
+Below cell starts tensorboard within the notebook.
 
 <div class="alert alert-danger">
-If you launched jupyter lab from ssh terminal, you do need the <code>--host &lt;hostname&gt;</code> flag above. <code>&lt;hostname&gt;</code> is the address of your compute node that ends in amazonaws.com.
+If you launched jupyter lab from ssh terminal, you do need the <code>--host &lt;your-server-name&gt;</code> flag above. <code>&lt;your-server-name&gt;</code> is the address of your compute node that ends in amazonaws.com.
 
 You can also launch tensorboard in an independent tab by changing the `%` to `!`
 </div>
-"""
+'''
+
+# %% Imports and paths tags=[]
+%reload_ext tensorboard
+%tensorboard --logdir {log_dir} --host ec2-18-188-180-213.us-east-2.compute.amazonaws.com
 
 # %% [markdown]
 """
 ## Load Dataset.
-
-<div class="alert alert-info">
-Task 1.1
-Use <a href=https://czbiohub-sf.github.io/iohub/main/api/ngff.html#open-ome-zarr>
-<code>iohub.open_ome_zarr</code></a> to read the dataset and explore several FOVs with matplotlib.
-</div>
 
 There should be 301 FOVs in the dataset (12 GB compressed).
 
@@ -135,11 +132,9 @@ specified by the Open Microscopy Environment Next Generation File Format
 
 The layout on the disk is: row/col/field/pyramid_level/timepoint/channel/z/y/x.
 Notice that labelling of nuclei channel is not complete - some cells are not expressing the fluorescent protein.
-
 """
 
 # %%
-
 dataset = open_ome_zarr(data_path)
 
 print(f"Number of positions: {len(list(dataset.positions()))}")
@@ -176,13 +171,16 @@ for i in range(n_channels):
 plt.tight_layout()
 
 # %% [markdown]
+# <div class="alert alert-info">
+#
+# ### Task 1.1
+#     
+# Look at a couple different fields of view by changing the value in the cell above. See if you notice any missing or inconsistent staining.
+# </div>
+
+# %% [markdown]
 """
 ## Explore the effects of augmentation on batch.
-
-<div class="alert alert-info">
-Task 1.2
-Setup the data loader and log several batches to tensorboard.
-</div>`
 
 VisCy builds on top of PyTorch Lightning. PyTorch Lightning is a thin wrapper around PyTorch that allows rapid experimentation. It provides a [DataModule](https://lightning.ai/docs/pytorch/stable/data/datamodule.html) to handle loading and processing of data during training. VisCy provides a child class, `HCSDataModule` to make it intuitve to access data stored in the HCS layout.
   
@@ -190,8 +188,19 @@ The dataloader in `HCSDataModule` returns a batch of samples. A `batch` is a lis
 - `source`: the input image, a tensor of size 1*1*Y*X
 - `target`: the target image, a tensor of size 2*1*Y*X
 - `index` : the tuple of (location of field in HCS layout, time, and z-slice) of the sample.
-
 """
+
+# %% [markdown]
+# <div class="alert alert-info">
+#
+# ### Task 1.2
+#
+# Setup the data loader and log several batches to tensorboard.
+#
+# Based on the tensorboard images, what are the two channels in the target image?
+#
+# Note: If tensorboard is not showing images, try refreshing and using the "Images" tab.
+# </div>
 
 # %%
 # Define a function to write a batch to tensorboard log.
@@ -238,10 +247,56 @@ def log_batch_tensorboard(batch, batchno, writer, card_name):
 
 
 # %%
+# Define a function to visualize a batch on jupyter, in case tensorboard is finicky 
+
+def log_batch_jupyter(batch):
+    """
+    Logs a batch of images on jupyter using ipywidget.
+
+    Args:
+        batch (dict): A dictionary containing the batch of images to be logged.
+
+    Returns:
+        None
+    """
+    batch_phase = batch["source"][:, :, 0, :, :]  # batch_size x z_size x Y x X tensor.
+    batch_size = batch_phase.shape[0]
+    batch_membrane = batch["target"][:, 1, 0, :, :].unsqueeze(
+        1
+    )  # batch_size x 1 x Y x X tensor.
+    batch_nuclei = batch["target"][:, 0, 0, :, :].unsqueeze(
+        1
+    )  # batch_size x 1 x Y x X tensor.
+
+    p1, p99 = np.percentile(batch_membrane, (0.1, 99.9))
+    batch_membrane = np.clip((batch_membrane - p1) / (p99 - p1), 0, 1)
+
+    p1, p99 = np.percentile(batch_nuclei, (0.1, 99.9))
+    batch_nuclei = np.clip((batch_nuclei - p1) / (p99 - p1), 0, 1)
+
+    p1, p99 = np.percentile(batch_phase, (0.1, 99.9))
+    batch_phase = np.clip((batch_phase - p1) / (p99 - p1), 0, 1)
+
+    plt.figure()
+    fig, axes = plt.subplots(batch_size, n_channels, figsize=(10, 10))
+    [N, C, H, W] = batch_phase.shape
+    for sample_id in range(batch_size):
+        axes[sample_id, 0].imshow(batch_phase[sample_id,0])
+        axes[sample_id, 1].imshow(batch_nuclei[sample_id,0])
+        axes[sample_id, 2].imshow(batch_membrane[sample_id,0])
+
+        for i in range(n_channels):
+            axes[sample_id, i].axis("off")
+            axes[sample_id, i].set_title(dataset.channel_names[i])
+    plt.tight_layout()
+    plt.show()
+
+
+# %%
 
 # Initialize the data module.
 
-BATCH_SIZE = 42
+BATCH_SIZE = 4
 # 42 is a perfectly reasonable batch size. After all, it is the answer to the ultimate question of life, the universe and everything.
 # More seriously, batch size does not have to be a power of 2.
 # See: https://sebastianraschka.com/blog/2022/batch-size-2.html
@@ -271,57 +326,55 @@ writer = SummaryWriter(log_dir=f"{log_dir}/view_batch")
 # Draw a batch and write to tensorboard.
 batch = next(iter(train_dataloader))
 log_batch_tensorboard(batch, 0, writer, "augmentation/none")
-
-# Iterate through all the batches and log them to tensorboard.
-for i, batch in enumerate(train_dataloader):
-    log_batch_tensorboard(batch, i, writer, "augmentation/none")
 writer.close()
 
 
 # %% [markdown]
+# Visualize directly on Jupyter ☄️, if your tensorboard is causing issues.
+
+# %%
+%matplotlib inline
+log_batch_jupyter(batch)
+
+# %% [markdown]
 """
 ## View augmentations using tensorboard.
-
-<div class="alert alert-info">
-Task 1.3
-Turn on augmentation and view the batch in tensorboard.
-</div>
-
 """
 # %%
-##########################
-######## TODO ########
-##########################
-
-# Write code to turn on augmentations, change batch sizes and log them to tensorboard.
-# See how the training data changes as a function of these parameters.
-# Remember to call `data_module.setup("fit")` after changing the parameters.
-
-
-# %% tags=["solution"]
-##########################
-######## Solution ########
-##########################
-
+# Here we turn on data augmentation and rerun setup
 data_module.augment = True
-data_module.batch_size = 21
-data_module.split_ratio = 0.8
 data_module.setup("fit")
 
-train_dataloader = data_module.train_dataloader()
+# get the new data loader with augmentation turned on
+augmented_train_dataloader = data_module.train_dataloader()
+
 # Draw batches and write to tensorboard
 writer = SummaryWriter(log_dir=f"{log_dir}/view_batch")
-for i, batch in enumerate(train_dataloader):
-    log_batch_tensorboard(batch, i, writer, "augmentation/some")
+augmented_batch = next(iter(augmented_train_dataloader))
+log_batch_tensorboard(augmented_batch, 0, writer, "augmentation/some")
 writer.close()
+
+# %% [markdown]
+# Visualize directly on Jupyter ☄️
+
+# %%
+log_batch_jupyter(augmented_batch)
+
+# %% [markdown]
+# <div class="alert alert-info">
+#
+# ### Task 1.3
+# Can you tell what augmentation were applied from looking at the augmented images in Tensorboard?
+#
+# Check your answer using the source code [here](https://github.com/mehta-lab/VisCy/blob/b89f778b34735553cf155904eef134c756708ff2/viscy/light/data.py#L529).
+# </div>
 
 # %% [markdown]
 """
 ## Train a 2D U-Net model to predict nuclei and membrane from phase.
 
 ### Construct a 2D U-Net
-See ``viscy.unet.networks.Unet2D.Unet2d`` for configuration details.
-
+See ``viscy.unet.networks.Unet2D.Unet2d`` ([source code](https://github.com/mehta-lab/VisCy/blob/7c5e4c1d68e70163cf514d22c475da8ea7dc3a88/viscy/unet/networks/Unet2D.py#L7)) for configuration details.
 """
 # %%
 # Create a 2D UNet.
@@ -378,14 +431,18 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_data)
 
 
 # %% [markdown]
-"""
-### View model graph.
+# ## View model graph.
+#
+# PyTorch uses dynamic graphs under the hood. The graphs are constructed on the fly. This is in contrast to TensorFlow, where the graph is constructed before the training loop and remains static. In other words, the graph of the network can change with every forward pass. Therefore, we need to supply an input tensor to construct the graph. The input tensor can be a random tensor of the correct shape and type. We can also supply a real image from the dataset. The latter is more useful for debugging.
 
-PyTorch uses dynamic graphs under the hood. The graphs are constructed on the fly. This is in contrast to TensorFlow, where the graph is constructed before the training loop and remains static. In other words, the graph of the network can change with every forward pass. Therefore, we need to supply an input tensor to construct the graph. The input tensor can be a random tensor of the correct shape and type. We can also supply a real image from the dataset. The latter is more useful for debugging.
+# %% [markdown]
+# <div class="alert alert-info">
+#
+# ### Task 1.4
+# Run the next cell to generate a graph representation of the model architecture. Can you recognize the UNet structure and skip connections in this graph visualization?
+# </div>
 
-"""
-
-
+# %%
 # visualize graph of phase2fluor model as image.
 model_graph_phase2fluor = torchview.draw_graph(
     phase2fluor_model,
@@ -399,10 +456,10 @@ model_graph_phase2fluor.visual_graph
 # %% [markdown]
 """
 <div class="alert alert-info">
-Task 1.4
-Setup the training for ~50 epochs
-</div>
 
+### Task 1.5
+Start training by running the following cell. Check the new logs on the tensorboard.
+</div>
 """
 
 
@@ -411,7 +468,7 @@ Setup the training for ~50 epochs
 GPU_ID = 0
 n_samples = len(phase2fluor_data.train_dataset)
 steps_per_epoch = n_samples // BATCH_SIZE  # steps per epoch.
-n_epochs = 3  # Set this to 50 or the number of epochs you want to train for.
+n_epochs = 5 # Set this to 50 or the number of epochs you want to train for.
 
 trainer = VSTrainer(
     accelerator="gpu",
@@ -424,32 +481,26 @@ trainer = VSTrainer(
         # lightning trainer transparently saves logs and model checkpoints in this directory.
         name="phase2fluor",
         log_graph=True,
-    ),
-)
+        ),
+    )  
 # Launch training and check that loss and images are being logged on tensorboard.
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_data)
 
 # %% [markdown]
 """
 <div class="alert alert-success">
-Checkpoint 1
+
+## Checkpoint 1
 
 Now the training has started,
 we can come back after a while and evaluate the performance!
 </div>
 """
 
-# %% [markdown] <a id='1_fluor2phase'></a>
+# %% <a [markdown] id='1_fluor2phase'></a>
 """
 # Part 2: Assess previous model, train fluorescence to phase contrast translation model.
 --------------------------------------------------
-"""
-
-# %% [markdown]
-"""
-<div class="alert alert-info">
-Task 2.1 Compute metrics for phase2fluor model. 
-</div>
 """
 
 # %% [markdown]
@@ -459,8 +510,29 @@ We now look at some metrics of performance of previous model. We typically evalu
 - [Structural similarity](https://en.wikipedia.org/wiki/Structural_similarity) (SSIM).
 
 You should also look at the validation samples on tensorboard (hint: the experimental data in nuclei channel is imperfect.)
-
 """
+
+# %% [markdown]
+"""
+<div class="alert alert-info">
+
+### Task 2.1 Define metrics
+
+For each of the above metrics, write a brief definition of what they are and what they mean for this image translation task.
+
+</div>
+"""
+
+# %% [markdown]
+# ```
+# #######################
+# ##### Todo ############
+# #######################
+# ```
+#
+# - Pearson Correlation:
+#
+# - Structural similarity: 
 
 # %% Compute metrics directly and plot here.
 test_data_path = Path(
@@ -487,6 +559,7 @@ def min_max_scale(input):
     return (input - np.min(input)) / (np.max(input) - np.min(input))
 
 
+# %% Compute metrics directly and plot here.
 for i, sample in enumerate(test_data.test_dataloader()):
     phase_image = sample["source"]
     with torch.inference_mode():  # turn off gradient computation.
@@ -522,20 +595,50 @@ test_metrics.boxplot(
 )
 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 """
 <div class="alert alert-info">
-Task 2.2 Train fluorescence to phase contrast translation model
+
+### Task 2.2 Train fluorescence to phase contrast translation model
+
+Instantiate a data module, model, and trainer for fluorescence to phase contrast translation. Copy over the code from previous cells and update the parameters. Give the variables and paths a different name/suffix (fluor2phase) to avoid overwriting objects used to train phase2fluor models.
 </div>
 """
-# %%
+# %% tags=[]
 ##########################
 ######## TODO ########
 ##########################
 
-# Instantiate a data module, model, and trainer for fluorescence to phase contrast translation. Copy over the code from previous cells and update the parameters. Give the variables and paths a different name/suffix (fluor2phase) to avoid overwriting objects used to train phase2fluor models.
+fluor2phase_data = HCSDataModule(
+    # Your code here (copy from above and modify as needed)
+)
+fluor2phase_data.setup("fit")
 
-# %% tags = ["solution"]
+# Dictionary that specifies key parameters of the model.
+fluor2phase_config = {
+    # Your config here
+}
+
+fluor2phase_model = VSUNet(
+    # Your code here (copy from above and modify as needed)
+)
+
+trainer = VSTrainer(
+    # Your code here (copy from above and modify as needed)
+)
+trainer.fit(fluor2phase_model, datamodule=fluor2phase_data)
+
+
+# Visualize the graph of fluor2phase model as image.
+model_graph_fluor2phase = torchview.draw_graph(
+    fluor2phase_model,
+    fluor2phase_data.train_dataset[0]["source"],
+    depth=2,  # adjust depth to zoom in.
+    device="cpu",
+)
+model_graph_fluor2phase.visual_graph
+
+# %% tags=["solution"]
 
 ##########################
 ######## Solution ########
@@ -595,55 +698,150 @@ trainer.fit(fluor2phase_model, datamodule=fluor2phase_data)
 
 # Visualize the graph of fluor2phase model as image.
 model_graph_fluor2phase = torchview.draw_graph(
-    phase2fluor_model,
-    phase2fluor_data.train_dataset[0]["source"],
+    fluor2phase_model,
+    fluor2phase_data.train_dataset[0]["source"],
     depth=2,  # adjust depth to zoom in.
     device="cpu",
 )
 model_graph_fluor2phase.visual_graph
 
-# %% [markdown]
+# %% [markdown] tags=[]
 """
-<div class="alert alert-success">
-Checkpoint 2
-Please summarize hyperparameters and performance of your models in the google doc 
+<div class="alert alert-info">
 
-Now that you have trained two models, let's think about the following questions:
+### Task 2.3
+
+While your model is training, let's think about the following questions:
 - What is the information content of each channel in the dataset?
 - How would you use image translation models?
 - What can you try to improve the performance of each model?
+</div>
+"""
+# %%
+test_data_path = Path(
+    "~/data/04_image_translation/HEK_nuclei_membrane_test.zarr"
+).expanduser()
 
+test_data = HCSDataModule(
+    test_data_path,
+    source_channel="Nuclei", # or Membrane, depending on your choice of source
+    target_channel="Phase",
+    z_window_size=1,
+    batch_size=1,
+    num_workers=8,
+    architecture="2D",
+)
+test_data.setup("test")
+
+test_metrics = pd.DataFrame(
+    columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
+)
+
+
+def min_max_scale(input):
+    return (input - np.min(input)) / (np.max(input) - np.min(input))
+
+
+# %%
+for i, sample in enumerate(test_data.test_dataloader()):
+    source_image = sample["source"]
+    with torch.inference_mode():  # turn off gradient computation.
+        predicted_image = fluor2phase_model(source_image)
+
+    target_image = (
+        sample["target"].cpu().numpy().squeeze(0)
+    )  # Squeezing batch dimension.
+    predicted_image = predicted_image.cpu().numpy().squeeze(0)
+    source_image = source_image.cpu().numpy().squeeze(0)
+    target_phase = min_max_scale(target_image[0, 0, :, :])
+    # slicing channel dimension, squeezing z-dimension.
+    predicted_phase = min_max_scale(predicted_image[0, :, :, :].squeeze(0))
+
+    # Compute SSIM and pearson correlation.
+    ssim_phase = metrics.structural_similarity(target_phase, predicted_phase, data_range=1)
+    pearson_phase = np.corrcoef(target_phase.flatten(), predicted_phase.flatten())[0, 1]
+
+    test_metrics.loc[i] = {
+        "pearson_phase": pearson_phase,
+        "SSIM_phase": ssim_phase,
+    }
+
+test_metrics.boxplot(
+    column=["pearson_phase", "SSIM_phase"],
+    rot=30,
+)
+
+# %% [markdown] tags=[]
+"""
+<div class="alert alert-success">
+
+## Checkpoint 2
+When your model finishes training, please summarize hyperparameters and performance of your models in the [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z)
 
 </div>
 """
 
-# %% [markdown] <a id='3_tuning'></a>
+# %% <a [markdown] id='3_tuning'></a> tags=[]
 """
 # Part 3: Tune the models.
 --------------------------------------------------
 
 Learning goals: Understand how data, model capacity, and training parameters control the performance of the model. Your goal is to try to underfit or overfit the model.
-
-Pick a model (phase2fluor or fluor2phase) and find optimal hyperparameters such that the model just overfits the data. Adjust following hyperparameters:
-* Number of filters at each stage (width and depth of the model).
-* Dropout rate.
-* Turn on/off augmentation.
-* Learning rate.
 """
 
 
-# %%
-# %%
+# %% [markdown] tags=[]
+"""
+<div class="alert alert-info">
+
+### Task 3.1
+
+- Choose a model you want to train (phase2fluor or fluor2phase).
+- Set up a configuration that you think will improve the performance of the model
+- Consider modifying the learning rate and see how it changes performance
+- Use training loop illustrated in previous cells to train phase2fluor and fluor2phase models to prototype your own training loop.
+- Add code to evaluate the model using Pearson Correlation and SSIM
+
+As your model is training, please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z)
+
+</div>
+"""
+# %% tags=[]
 ##########################
 ######## TODO ########
 ##########################
 
-# Choose a model you want to train (phase2fluor or fluor2phase).
-# Create a config to double the number of filters at each stage.
-# Use training loop illustrated in previous cells to train phase2fluor and fluor2phase models to prototype your own training loop.
+tune_data = HCSDataModule(
+    # Your code here (copy from above and modify as needed)
+)
+tune_data.setup("fit")
+
+# Dictionary that specifies key parameters of the model.
+tune_config = {
+    # Your config here
+}
+
+tune_model = VSUNet(
+    # Your code here (copy from above and modify as needed)
+)
+
+trainer = VSTrainer(
+    # Your code here (copy from above and modify as needed)
+)
+trainer.fit(tune_model, datamodule=tune_data)
 
 
-# %% tags = ["solution"]
+# Visualize the graph of fluor2phase model as image.
+model_graph_tune = torchview.draw_graph(
+    tune_model,
+    tune_data.train_dataset[0]["source"],
+    depth=2,  # adjust depth to zoom in.
+    device="cpu",
+)
+model_graph_tune.visual_graph
+
+
+# %% tags=["solution"]
 
 ##########################
 ######## Solution ########
@@ -685,16 +883,7 @@ trainer = VSTrainer(
 )  # Set fast_dev_run to False to train the model.
 trainer.fit(phase2fluor_wider_model, datamodule=phase2fluor_data)
 
-# %%
-##########################
-######## TODO ########
-##########################
-
-# Choose a model you want to train (phase2fluor or fluor2phase).
-# Train it with lower learning rate to see how the performance changes.
-
-
-# %% tags = ["solution"]
+# %% tags=["solution"]
 
 ##########################
 ######## Solution ########
@@ -727,12 +916,21 @@ trainer = VSTrainer(
 trainer.fit(phase2fluor_slow_model, datamodule=phase2fluor_data)
 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 """
 <div class="alert alert-success">
-Checkpoint 3
+    
+## Checkpoint 3
 
 Congratulations! You have trained several image translation models now!
-Please document hyperparameters, snapshots of predictioons on validation set, and loss curves for your models in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z)
+Please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models and add the final perforance in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z). We'll discuss our combined results as a group.
 </div>
 """
+
+# %% tags=[]
+
+# %%
+
+# %%
+
+# %%
