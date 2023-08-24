@@ -22,8 +22,10 @@ VisCy exploits recent advances in the data and metadata formats ([OME-zarr](http
 """
 Today, we will train a 2D image translation model using a 2D U-Net with residual connections. We will use a dataset of 301 fields of view (FOVs) of Human Embryonic Kidney (HEK) cells, each FOV has 3 channels (phase, membrane, and nuclei). The cells were labeled with CRISPR editing. Intrestingly, not all cells during this experiment were labeled due to the stochastic nature of CRISPR editing. In such situations, virtual staining rescues missing labels.
 ![HEK](https://github.com/mehta-lab/VisCy/blob/dlmbl2023/docs/figures/phase_to_nuclei_membrane.svg?raw=true)
-
-<div class="alert alert-info">
+"""
+# %% [markdown]
+"""
+<div class="alert alert-warning">
 The exercise is organized in 3 parts.
 
 * **Part 1** - Explore the data using tensorboard. Launch the training before lunch.
@@ -31,7 +33,9 @@ The exercise is organized in 3 parts.
 * **Part 2** - Evaluate the training with tensorboard. Train another model.
 * **Part 3** - Tune the models to improve performance.
 </div>
-
+"""
+# %% [markdown]
+"""
 📖 As you work through parts 2 and 3, please share the layouts of your models (output of torchview) and their performance with everyone via [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z) 📖.
 
 
@@ -39,11 +43,11 @@ Our guesstimate is that each of the three parts will take ~1.5 hours. A reasonab
 We will discuss your observations on google doc after checkpoints 2 and 3.
 
 The focus of the exercise is on understanding information content of the data, how to train and evaluate 2D image translation model, and explore some hyperparameters of the model. If you complete this exercise and have time to spare, try the bonus exercise on 3D image translation.
-
-There are a few coding tasks sprinkled in parts 1 and 2, but part 3 is where you start writing and debugging code in the earnest. Before you start,
-
+"""
+# %% [markdown]
+"""
 <div class="alert alert-danger">
-Set your python kernel to <span style="color:black;">04-image-translation</span>
+Set your python kernel to <span style="color:black;">04_image_translation</span>
 </div>
 """
 # %% <a [markdown] id='1_phase2fluor'></a>
@@ -61,7 +65,6 @@ Learning goals:
 """
 
 # %% Imports and paths
-
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -78,8 +81,7 @@ from ipywidgets import interact, widgets
 from IPython.display import display
 from ipywidgets import Button, Layout
 
-%matplotlib notebook
-
+# %% Imports and paths
 # pytorch lightning wrapper for Tensorboard.
 from torch.utils.tensorboard import SummaryWriter  # for logging to tensorboard
 
@@ -114,7 +116,7 @@ You can also launch tensorboard in an independent tab by changing the `%` to `!`
 
 # %% Imports and paths tags=[]
 %reload_ext tensorboard
-%tensorboard --logdir {log_dir}
+%tensorboard --logdir {log_dir} --host ec2-18-188-180-213.us-east-2.compute.amazonaws.com
 
 # %% [markdown]
 """
@@ -133,7 +135,6 @@ Notice that labelling of nuclei channel is not complete - some cells are not exp
 """
 
 # %%
-
 dataset = open_ome_zarr(data_path)
 
 print(f"Number of positions: {len(list(dataset.positions()))}")
@@ -244,9 +245,9 @@ def log_batch_tensorboard(batch, batchno, writer, card_name):
     # add the grid to tensorboard
     writer.add_image(card_name, grid, batchno)
 
-# %%
-# Define a function to visualize a batch on jupyter 
 
+# %%
+# Define a function to visualize a batch on jupyter, in case tensorboard is finicky 
 
 def log_batch_jupyter(batch):
     """
@@ -259,6 +260,7 @@ def log_batch_jupyter(batch):
         None
     """
     batch_phase = batch["source"][:, :, 0, :, :]  # batch_size x z_size x Y x X tensor.
+    batch_size = batch_phase.shape[0]
     batch_membrane = batch["target"][:, 1, 0, :, :].unsqueeze(
         1
     )  # batch_size x 1 x Y x X tensor.
@@ -276,34 +278,25 @@ def log_batch_jupyter(batch):
     batch_phase = np.clip((batch_phase - p1) / (p99 - p1), 0, 1)
 
     plt.figure()
-    fig, axes = plt.subplots(1, n_channels, figsize=(9, 3))
-
+    fig, axes = plt.subplots(batch_size, n_channels, figsize=(10, 10))
     [N, C, H, W] = batch_phase.shape
-    def f(index):
-        axes[0].imshow(batch_phase[index,0])
-        axes[1].imshow(batch_nuclei[index,0])
-        axes[2].imshow(batch_membrane[index,0])
-        fig.canvas.draw()
-        fig.canvas.flush_events()
+    for sample_id in range(batch_size):
+        axes[sample_id, 0].imshow(batch_phase[sample_id,0])
+        axes[sample_id, 1].imshow(batch_nuclei[sample_id,0])
+        axes[sample_id, 2].imshow(batch_membrane[sample_id,0])
 
-    axes[0].imshow(batch_phase[0,0])
-    axes[1].imshow(batch_nuclei[0,0])
-    axes[2].imshow(batch_membrane[0,0])
-
-    for i in range(n_channels):
-        axes[i].axis("off")
-        axes[i].set_title(dataset.channel_names[i])
-
-    interact(f, index = widgets.IntSlider(min=0, max=N-1, step=1, value=0, continuous_update=False, layout=Layout(width='auto', height='auto')))
+        for i in range(n_channels):
+            axes[sample_id, i].axis("off")
+            axes[sample_id, i].set_title(dataset.channel_names[i])
+    plt.tight_layout()
     plt.show()
-  
 
 
 # %%
 
 # Initialize the data module.
 
-BATCH_SIZE = 42
+BATCH_SIZE = 4
 # 42 is a perfectly reasonable batch size. After all, it is the answer to the ultimate question of life, the universe and everything.
 # More seriously, batch size does not have to be a power of 2.
 # See: https://sebastianraschka.com/blog/2022/batch-size-2.html
@@ -333,17 +326,14 @@ writer = SummaryWriter(log_dir=f"{log_dir}/view_batch")
 # Draw a batch and write to tensorboard.
 batch = next(iter(train_dataloader))
 log_batch_tensorboard(batch, 0, writer, "augmentation/none")
-
-# Iterate through all the batches and log them to tensorboard.
-for i, batch in enumerate(train_dataloader):
-    log_batch_tensorboard(batch, i, writer, "augmentation/none")
 writer.close()
 
 
 # %% [markdown]
-# Visualize directly on Jupyter ☄️
+# Visualize directly on Jupyter ☄️, if your tensorboard is causing issues.
 
 # %%
+%matplotlib inline
 log_batch_jupyter(batch)
 
 # %% [markdown]
@@ -360,17 +350,15 @@ augmented_train_dataloader = data_module.train_dataloader()
 
 # Draw batches and write to tensorboard
 writer = SummaryWriter(log_dir=f"{log_dir}/view_batch")
-for i, batch in enumerate(augmented_train_dataloader):
-    log_batch_tensorboard(batch, i, writer, "augmentation/some")
+augmented_batch = next(iter(augmented_train_dataloader))
+log_batch_tensorboard(augmented_batch, 0, writer, "augmentation/some")
 writer.close()
-
-
 
 # %% [markdown]
 # Visualize directly on Jupyter ☄️
 
 # %%
-log_batch_jupyter(batch)
+log_batch_jupyter(augmented_batch)
 
 # %% [markdown]
 # <div class="alert alert-info">
@@ -468,48 +456,6 @@ model_graph_phase2fluor.visual_graph
 # %% [markdown]
 """
 <div class="alert alert-info">
-Task 1.4
-Setup the training for ~50 epochs
-</div>
-"""
-
-
-# %%
-
-GPU_ID = 0
-n_samples = len(phase2fluor_data.train_dataset)
-steps_per_epoch = n_samples // BATCH_SIZE  # steps per epoch.
-n_epochs = 3  # Set this to 50 or the number of epochs you want to train for.
-
-trainer = VSTrainer(
-    accelerator="gpu",
-    devices=[GPU_ID],
-    max_epochs=n_epochs,
-    log_every_n_steps=steps_per_epoch // 2,
-    # log losses and image samples 2 times per epoch.
-    logger=TensorBoardLogger(
-        save_dir=log_dir,
-        # lightning trainer transparently saves logs and model checkpoints in this directory.
-        name="phase2fluor",
-        log_graph=True,
-    ),
-)
-# Launch training and check that loss and images are being logged on tensorboard.
-trainer.fit(phase2fluor_model, datamodule=phase2fluor_data)
-
-# %% [markdown]
-"""
-<div class="alert alert-success">
-Checkpoint 1
-
-Now the training has started,
-we can come back after a while and evaluate the performance!
-</div>
-"""
-
-# %% [markdown]
-"""
-<div class="alert alert-info">
 
 ### Task 1.5
 Start training by running the following cell. Check the new logs on the tensorboard.
@@ -522,7 +468,7 @@ Start training by running the following cell. Check the new logs on the tensorbo
 GPU_ID = 0
 n_samples = len(phase2fluor_data.train_dataset)
 steps_per_epoch = n_samples // BATCH_SIZE  # steps per epoch.
-n_epochs = 50 # Set this to 50 or the number of epochs you want to train for.
+n_epochs = 5 # Set this to 50 or the number of epochs you want to train for.
 
 trainer = VSTrainer(
     accelerator="gpu",
@@ -613,6 +559,7 @@ def min_max_scale(input):
     return (input - np.min(input)) / (np.max(input) - np.min(input))
 
 
+# %% Compute metrics directly and plot here.
 for i, sample in enumerate(test_data.test_dataloader()):
     phase_image = sample["source"]
     with torch.inference_mode():  # turn off gradient computation.
@@ -770,6 +717,60 @@ While your model is training, let's think about the following questions:
 - What can you try to improve the performance of each model?
 </div>
 """
+# %%
+test_data_path = Path(
+    "~/data/04_image_translation/HEK_nuclei_membrane_test.zarr"
+).expanduser()
+
+test_data = HCSDataModule(
+    test_data_path,
+    source_channel="Nuclei", # or Membrane, depending on your choice of source
+    target_channel="Phase",
+    z_window_size=1,
+    batch_size=1,
+    num_workers=8,
+    architecture="2D",
+)
+test_data.setup("test")
+
+test_metrics = pd.DataFrame(
+    columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
+)
+
+
+def min_max_scale(input):
+    return (input - np.min(input)) / (np.max(input) - np.min(input))
+
+
+# %%
+for i, sample in enumerate(test_data.test_dataloader()):
+    source_image = sample["source"]
+    with torch.inference_mode():  # turn off gradient computation.
+        predicted_image = fluor2phase_model(source_image)
+
+    target_image = (
+        sample["target"].cpu().numpy().squeeze(0)
+    )  # Squeezing batch dimension.
+    predicted_image = predicted_image.cpu().numpy().squeeze(0)
+    source_image = source_image.cpu().numpy().squeeze(0)
+    target_phase = min_max_scale(target_image[0, 0, :, :])
+    # slicing channel dimension, squeezing z-dimension.
+    predicted_phase = min_max_scale(predicted_image[0, :, :, :].squeeze(0))
+
+    # Compute SSIM and pearson correlation.
+    ssim_phase = metrics.structural_similarity(target_phase, predicted_phase, data_range=1)
+    pearson_phase = np.corrcoef(target_phase.flatten(), predicted_phase.flatten())[0, 1]
+
+    test_metrics.loc[i] = {
+        "pearson_phase": pearson_phase,
+        "SSIM_phase": ssim_phase,
+    }
+
+test_metrics.boxplot(
+    column=["pearson_phase", "SSIM_phase"],
+    rot=30,
+)
+
 # %% [markdown] tags=[]
 """
 <div class="alert alert-success">
@@ -786,7 +787,6 @@ When your model finishes training, please summarize hyperparameters and performa
 --------------------------------------------------
 
 Learning goals: Understand how data, model capacity, and training parameters control the performance of the model. Your goal is to try to underfit or overfit the model.
-
 """
 
 
@@ -800,6 +800,7 @@ Learning goals: Understand how data, model capacity, and training parameters con
 - Set up a configuration that you think will improve the performance of the model
 - Consider modifying the learning rate and see how it changes performance
 - Use training loop illustrated in previous cells to train phase2fluor and fluor2phase models to prototype your own training loop.
+- Add code to evaluate the model using Pearson Correlation and SSIM
 
 As your model is training, please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z)
 
@@ -927,3 +928,9 @@ Please document hyperparameters, snapshots of predictions on validation set, and
 """
 
 # %% tags=[]
+
+# %%
+
+# %%
+
+# %%

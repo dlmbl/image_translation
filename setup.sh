@@ -6,7 +6,7 @@ START_DIR=$(pwd)
 mamba create -y --name 04_image_translation python=3.10
 
 # Install ipykernel in the environment.
-mamba install -y ipykernel nbformat nbconvert black jupytext --name 04_image_translation
+mamba install -y ipykernel nbformat nbconvert black jupytext ipywidgets --name 04_image_translation
 # Specifying the environment explicitly.
 # mamba activate sometimes doesn't work from within shell scripts.
 
