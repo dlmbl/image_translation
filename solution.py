@@ -74,6 +74,11 @@ from iohub import open_ome_zarr
 from lightning.pytorch import seed_everything
 from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 from skimage import metrics  # for metrics.
+from ipywidgets import interact, widgets
+from IPython.display import display
+from ipywidgets import Button, Layout
+
+%matplotlib notebook
 
 # pytorch lightning wrapper for Tensorboard.
 from torch.utils.tensorboard import SummaryWriter  # for logging to tensorboard
@@ -239,6 +244,60 @@ def log_batch_tensorboard(batch, batchno, writer, card_name):
     # add the grid to tensorboard
     writer.add_image(card_name, grid, batchno)
 
+# %%
+# Define a function to visualize a batch on jupyter 
+
+
+def log_batch_jupyter(batch):
+    """
+    Logs a batch of images on jupyter using ipywidget.
+
+    Args:
+        batch (dict): A dictionary containing the batch of images to be logged.
+
+    Returns:
+        None
+    """
+    batch_phase = batch["source"][:, :, 0, :, :]  # batch_size x z_size x Y x X tensor.
+    batch_membrane = batch["target"][:, 1, 0, :, :].unsqueeze(
+        1
+    )  # batch_size x 1 x Y x X tensor.
+    batch_nuclei = batch["target"][:, 0, 0, :, :].unsqueeze(
+        1
+    )  # batch_size x 1 x Y x X tensor.
+
+    p1, p99 = np.percentile(batch_membrane, (0.1, 99.9))
+    batch_membrane = np.clip((batch_membrane - p1) / (p99 - p1), 0, 1)
+
+    p1, p99 = np.percentile(batch_nuclei, (0.1, 99.9))
+    batch_nuclei = np.clip((batch_nuclei - p1) / (p99 - p1), 0, 1)
+
+    p1, p99 = np.percentile(batch_phase, (0.1, 99.9))
+    batch_phase = np.clip((batch_phase - p1) / (p99 - p1), 0, 1)
+
+    plt.figure()
+    fig, axes = plt.subplots(1, n_channels, figsize=(9, 3))
+
+    [N, C, H, W] = batch_phase.shape
+    def f(index):
+        axes[0].imshow(batch_phase[index,0])
+        axes[1].imshow(batch_nuclei[index,0])
+        axes[2].imshow(batch_membrane[index,0])
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+
+    axes[0].imshow(batch_phase[0,0])
+    axes[1].imshow(batch_nuclei[0,0])
+    axes[2].imshow(batch_membrane[0,0])
+
+    for i in range(n_channels):
+        axes[i].axis("off")
+        axes[i].set_title(dataset.channel_names[i])
+
+    interact(f, index = widgets.IntSlider(min=0, max=N-1, step=1, value=0, continuous_update=False, layout=Layout(width='auto', height='auto')))
+    plt.show()
+  
+
 
 # %%
 
@@ -282,6 +341,12 @@ writer.close()
 
 
 # %% [markdown]
+# Visualize directly on Jupyter ☄️
+
+# %%
+log_batch_jupyter(batch)
+
+# %% [markdown]
 """
 ## View augmentations using tensorboard.
 """
@@ -300,6 +365,12 @@ for i, batch in enumerate(augmented_train_dataloader):
 writer.close()
 
 
+
+# %% [markdown]
+# Visualize directly on Jupyter ☄️
+
+# %%
+log_batch_jupyter(batch)
 
 # %% [markdown]
 # <div class="alert alert-info">
