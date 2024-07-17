@@ -1,0 +1,4 @@
+data*
+*ipynb*
+*lightning_logs*
+.vscode
