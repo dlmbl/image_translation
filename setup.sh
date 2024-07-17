@@ -3,10 +3,10 @@
 START_DIR=$(pwd)
 
 # Create mamba environment
-mamba create -y --name 04_image_translation python=3.10
+conda create -y --name 04_image_translation python=3.10
 
 # Install ipykernel in the environment.
-mamba install -y ipykernel nbformat nbconvert black jupytext ipywidgets --name 04_image_translation
+conda install -y ipykernel nbformat nbconvert black jupytext ipywidgets --name 04_image_translation
 # Specifying the environment explicitly.
 # mamba activate sometimes doesn't work from within shell scripts.
 
@@ -20,6 +20,10 @@ git checkout 7c5e4c1d68e70163cf514d22c475da8ea7dc3a88 # Exercise is tested with 
 ENV_PATH=$(conda info --envs | grep 04_image_translation | awk '{print $NF}')
 $ENV_PATH/bin/pip install ."[metrics]"
 
+## Add in GAN requirements here
+cd ../
+mkdir -p ~/GAN_code/
+git clone https://github.com/Tonks684/GANs_MI2I.git
 # Create data directory
 mkdir -p ~/data/04_image_translation
 cd ~/data/04_image_translation

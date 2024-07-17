@@ -1,48 +1,49 @@
-# %% [markdown]
+# %% [markdown tag= "pix2pixGAN_explainer"]
 """
-# Image translation
+# Generative Modelling Approaches to Image translation
 ---
 
-Written by Ziwen Liu and Shalin Mehta, CZ Biohub San Francisco.
+Written by Samuel Tonks, Krull Lab, University of Birmingham, UK.
 
-In this exercise, we will solve an image translation task to predict fluorescence images of nuclei and membrane markers from quantitative phase images of cells. In other words, we will _virtually stain_ the nuclei and membrane visible in the phase image. 
+In this part of the exercise, we will approach the same supervised image-to-image translation task as in the previous parts, but using a different model architecture. Here we will explore a generative modelling approach; a conditional Generative Adversarial Network (cGAN). 
+In contrast to formulating the task as a regression problem where the model produces a single deterministic output, cGANs learn to map from the source domain to a target domain distribution. This learnt distribution can then be sampled from to produce virtual staining predictions that are no longer a compromise between possible solutions which leads to improved sharpness and realism in the generated images.
 
-Here, the source domain is label-free microscopy (material density) and the target domain is fluorescence microscopy (fluorophore density). The goal is to learn a mapping from the source domain to the target domain. We will use a deep convolutional neural network (CNN), specifically, a U-Net model with residual connections to learn the mapping. The preprocessing, training, prediction, evaluation, and deployment steps are unified in a computer vision pipeline for single-cell analysis that we call [VisCy](https://github.com/mehta-lab/VisCy).
+At a high-level a cGAN has two networks; a generator and a discriminator. The generator is a fully convolutional network that takes the source image as input and outputs the target image. The discriminator is also a fully convolutional network that takes as input the source image concatentated with a real or fake image and outputs the probabilities of whether the image is real or fake as shown in the Figure below: 
+[View PDF](https://github.com/Tonks684/image_translation/tree/main/imgs/GAN.pdf)
+The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)).
 
-VisCy evolved from our previous work on virtual staining of cellular components from their density and anisotropy.
-![](https://iiif.elifesciences.org/lax/55502%2Felife-55502-fig1-v2.tif/full/1500,/0/default.jpg)
-
-[Guo et al. (2020) Revealing architectural order with quantitative label-free imaging and deep learning
-. eLife](https://elifesciences.org/articles/55502).
-
-VisCy exploits recent advances in the data and metadata formats ([OME-zarr](https://www.nature.com/articles/s41592-021-01326-w)) and DL frameworks, [PyTorch Lightning](https://lightning.ai/) and [MONAI](https://monai.io/). 
+We will be exploring [Pix2PixHD GAN](https://arxiv.org/abs/1711.11585) architecture, a high-resolution extension of a traditional cGAN adapted for our recent [virtual staining works](https://ieeexplore.ieee.org/abstract/document/10230501?casa_token=NEyrUDqvFfIAAAAA:tklGisf9BEKWVjoZ6pgryKvLbF6JyurOu5Jrgoia1QQLpAMdCSlP9gMa02f3w37PvVjdiWCvFhA). 
+ Pix2PixHD GAN improves upon the traditional cGAN by using a coarse-to-fine generator, a multi-scale discrimator and additional loss terms. The "coarse-to-fine" generator is composed of two sub-networks, both ResNet architectures that operate at different scales. The first sub-network (G1) generates a low-resolution image, which is then upsampled and concatenated with the source image to produce a higher resolution image. The multi-scale discriminator is composed of 3 networks that operate at different scales, each network is trained to distinguish between real and fake images at that scale. The generator is trained to fool the discriminator at each scale. The additional loss terms include a feature matching loss, which encourages the generator to produce images that are similar to the real images at each scale. 
+[View PDF](https://github.com/Tonks684/image_translation/tree/main/imgs/Pix2PixHD_1.pdf)
+[View PDF](https://github.com/Tonks684/image_translation/tree/main/imgs/Pix2PixHD_2.pdf)
 """
+
 
 # %% [markdown]
 """
-Today, we will train a 2D image translation model using a 2D U-Net with residual connections. We will use a dataset of 301 fields of view (FOVs) of Human Embryonic Kidney (HEK) cells, each FOV has 3 channels (phase, membrane, and nuclei). The cells were labeled with CRISPR editing. Intrestingly, not all cells during this experiment were labeled due to the stochastic nature of CRISPR editing. In such situations, virtual staining rescues missing labels.
-![HEK](https://github.com/mehta-lab/VisCy/blob/dlmbl2023/docs/figures/phase_to_nuclei_membrane.svg?raw=true)
+Today, we will train a 2D image translation model using a Pix2PixHD GAN. We will use the same dataset of 301 fields of view (FOVs) of Human Embryonic Kidney (HEK) cells, each FOV has 3 channels (phase, membrane, and nuclei).
 """
 # %% [markdown]
 """
 <div class="alert alert-warning">
-The exercise is organized in 3 parts.
+This part of the exercise is organized in 3 parts. As you have already explored the data in the previous parts, we will focus on training and evaluating Pix2PixHD GAN. The parts are as follows:
 
-* **Part 1** - Explore the data using tensorboard. Launch the training before lunch.
-* Lunch break - The model will continue training during lunch.
-* **Part 2** - Evaluate the training with tensorboard. Train another model.
-* **Part 3** - Tune the models to improve performance.
+* **Part 1** - Download data, define dataloaders & start training a Pix2PixHD GAN.
+* **Part 2** - Load and assess pre-trained Pix2PixGAN using tensorboard, discuss new hyper-parameter configurations.
+* **Part 3** - Evaluate performance of pre-trained Pix2PixGAN using pixel-level and instance-level metrics by using Cellpose to segment the nuclei and membrane channels of the fluorescence and virtual staining images.
+* **Part 4** - BONUS: Sample different virtual staining solutions from the GAN using MC-Dropout.
 </div>
 """
 # %% [markdown]
 """
-📖 As you work through parts 2 and 3, please share the layouts of your models (output of torchview) and their performance with everyone via [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z) 📖.
+📖 As you work through parts 2 and 3, please share the default hyper-parameter settings and the performance with everyone via [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z) 📖.
 
 
-Our guesstimate is that each of the three parts will take ~1.5 hours. A reasonable 2D UNet can be trained in ~20 min on a typical AWS node. 
+Our guesstimate is that each of the three parts will take ~1.5 hours. A reasonable Pix2PixHD GAN can be trained in ~1.5 hours on a typical AWS node, this notebook is designed to walk you through the training steps but load a pre-trained model and tensorboard session to ensure we can complete the exercise in the time allocated.
+
 We will discuss your observations on google doc after checkpoints 2 and 3.
 
-The focus of the exercise is on understanding information content of the data, how to train and evaluate 2D image translation model, and explore some hyperparameters of the model. If you complete this exercise and have time to spare, try the bonus exercise on 3D image translation.
+The focus of this part of the exercise is on understanding a generative modelling approach to image translation, how to train and evaluate a cGAN, and explore some hyperparameters of the cGAN. 
 """
 # %% [markdown]
 """
@@ -50,511 +51,349 @@ The focus of the exercise is on understanding information content of the data, h
 Set your python kernel to <span style="color:black;">04_image_translation</span>
 </div>
 """
-# %% <a [markdown] id='1_phase2fluor'></a>
+# %% <a [markdown] id="1_phase2fluor"></a>
 """
-# Part 1: Log training data to tensorboard, start training a model.
+# Part 1: Download data, define dataloaders & understand how to train a model.
 ---------
 
 Learning goals:
 
-- Load the OME-zarr dataset and examine the channels.
-- Configure and understand the data loader.
-- Log some patches to tensorboard.
-- Initialize a 2D U-Net model for virtual staining
-- Start training the model to predict nuclei and membrane from phase.
+- Load dataset and configure dataloader.
+- Configure Pix2PixHD GAN and train to predict nuclei from phase.
 """
 
 # %% Imports and paths
 from pathlib import Path
-
-import matplotlib.pyplot as plt
+import os
+import torch
 import numpy as np
 import pandas as pd
-import torch
-import torchview
-import torchvision
-from iohub import open_ome_zarr
-from lightning.pytorch import seed_everything
-from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
-from skimage import metrics  # for metrics.
+# Import all the necessary hyperparameters and configurations for training.
+from GANs_MI2I.pix2pixHD.options.train_options import TrainOptions
+from GANs_MI2I.pix2pixHD.options.test_options import TestOptions
+# Import Pytorch dataloader and transforms.
+from GANs_MI2I.pix2pixHD.data.data_loader_dlmbl import CreateDataLoader
+# Import the model architecture.
+from GANs_MI2I.pix2pixHD.models import create_model
+# Import helper functions for visualization and processing.
+from GANs_MI2I.pix2pixHD.util.visualizer import Visualizer
+from GANs_MI2I.pix2pixHD.util import util
+# Import train script.
+from GANs_MI2I.pix2pixHD.train_dlmbl import train as train_model
+from GANs_MI2I.pix2pixHD.test_dlmbl import inference as inference_model
+# pytorch lightning wrapper for Tensorboard.
+from torch.utils.tensorboard import SummaryWriter
 
 # %% Imports and paths
-# pytorch lightning wrapper for Tensorboard.
-from torch.utils.tensorboard import SummaryWriter  # for logging to tensorboard
-
-# HCSDataModule makes it easy to load data during training.
-from viscy.light.data import HCSDataModule
-
-# Trainer class and UNet.
-from viscy.light.engine import VSTrainer, VSUNet
-
-seed_everything(42, workers=True)
-
-# Paths to data and log directory
-data_path = Path(
-    Path("~/data/04_image_translation/HEK_nuclei_membrane_pyramid.zarr/")
-).expanduser()
-
-log_dir = Path("~/data/04_image_translation/logs/").expanduser()
-
-# Create log directory if needed, and launch tensorboard
-log_dir.mkdir(parents=True, exist_ok=True)
-
-# %% [markdown] tags=[]
-'''
-The next cell starts tensorboard within the notebook.
-
-<div class="alert alert-danger">
-If you launched jupyter lab from ssh terminal, add <code>--host &lt;your-server-name&gt;</code> to the tensorboard command below. <code>&lt;your-server-name&gt;</code> is the address of your compute node that ends in amazonaws.com.
-
-You can also launch tensorboard in an independent tab (instead of in the notebook) by changing the `%` to `!`
-</div>
-'''
-
-# %% Imports and paths tags=[]
-%reload_ext tensorboard
-%tensorboard --logdir {log_dir} 
-
+# Initialize the default options and parse the arguments.
+opt = TrainOptions().parse()
+# Set the seed for reproducibility.
+util.set_seed(int(opt.seed))  
+# Set the experiment folder name.
+opt.name = "dlmbl_vsnuclei" 
+# Path to store all the logs.
+opt.checkpoints_dir = Path(f"~/data/04_image_translation/{opt.name}/logs/").expanduser()
 # %% [markdown]
 """
-## Load Dataset.
+## Download Dataset (I hope wont be needed but added it to enable testing).
 
-There should be 301 FOVs in the dataset (12 GB compressed).
-
-Each FOV consists of 3 channels of 2048x2048 images,
+The same dataset as in the previous parts is used here. There should be 301 FOVs in the dataset (12 GB compressed). Each FOV consists of 3 channels of 2048x2048 images,
 saved in the <a href="https://ngff.openmicroscopy.org/latest/#hcs-layout">
 High-Content Screening (HCS) layout</a>
 specified by the Open Microscopy Environment Next Generation File Format
 (OME-NGFF).
 
-The layout on the disk is: row/col/field/pyramid_level/timepoint/channel/z/y/x.
-Notice that labelling of nuclei channel is not complete - some cells are not expressing the fluorescent protein.
+Here we complete the following steps:
+
+- Set the path to download data to for output_image_folder
+- Download the datatset in zarr format
+- For phase, nuclei and cyto channels we extract 512x512 patches from the images
+- We then split the dataset into training (0.8) and validation (0.2) sets saving each image as a .tiff file., in train, validation folders respectively. 
+
 """
+# Path to save downloaded data too.
+output_image_folder = Path(
+    Path("/ADD/LOCATION/TO/DOWNLOAD/DATA/TOO")
+).expanduser()
+# Download the dataset and split it into training and validation sets.
+!python GANs_MI2I/download_and_split_dataset.py --output_image_folder {output_image_folder} --crop_size 512
 
-# %%
-dataset = open_ome_zarr(data_path)
-
-print(f"Number of positions: {len(list(dataset.positions()))}")
-
-# Use the field and pyramid_level below to visualize data.
-row = 0
-col = 0
-field = 23  # TODO: Change this to explore data.
-
-# This dataset contains images at 3 resolutions.
-# '0' is the highest resolution
-# '1' is down-scaled 2x2,
-# '2' is down-scaled 4x4.
-# Such datasets are called image pyramids.
-pyaramid_level = 0
-
-# `channel_names` is the metadata that is stored with data according to the OME-NGFF spec.
-n_channels = len(dataset.channel_names)
-
-image = dataset[f"{row}/{col}/{field}/{pyaramid_level}"].numpy()
-print(f"data shape: {image.shape}, FOV: {field}, pyramid level: {pyaramid_level}")
-
-figure, axes = plt.subplots(1, n_channels, figsize=(9, 3))
-
-for i in range(n_channels):
-    for i in range(n_channels):
-        channel_image = image[0, i, 0]
-        # Adjust contrast to 0.5th and 99.5th percentile of pixel values.
-        p_low, p_high = np.percentile(channel_image, (0.5, 99.5))
-        channel_image = np.clip(channel_image, p_low, p_high)
-        axes[i].imshow(channel_image, cmap="gray")
-        axes[i].axis("off")
-        axes[i].set_title(dataset.channel_names[i])
-plt.tight_layout()
-
-# %% [markdown]
-# <div class="alert alert-info">
-#
-# ### Task 1.1
-#     
-# Look at a couple different fields of view by changing the value in the cell above. See if you notice any missing or inconsistent staining.
-# </div>
-
-# %% [markdown]
+# %% [markdowntags=[dataloading]]
 """
-## Explore the effects of augmentation on batch.
-
-VisCy builds on top of PyTorch Lightning. PyTorch Lightning is a thin wrapper around PyTorch that allows rapid experimentation. It provides a [DataModule](https://lightning.ai/docs/pytorch/stable/data/datamodule.html) to handle loading and processing of data during training. VisCy provides a child class, `HCSDataModule` to make it intuitve to access data stored in the HCS layout.
-  
-The dataloader in `HCSDataModule` returns a batch of samples. A `batch` is a list of dictionaries. The length of the list is equal to the batch size. Each dictionary consists of following key-value pairs.
-- `source`: the input image, a tensor of size 1*1*Y*X
-- `target`: the target image, a tensor of size 2*1*Y*X
-- `index` : the tuple of (location of field in HCS layout, time, and z-slice) of the sample.
+## Load Dataset & Configure Dataloaders.
+Having downloaded and split our training and validation sets we now need to load the data into the model. We will use the Pytorch DataLoader class to load the data in batches. The DataLoader class is an iterator that provides a consistent way to load data in batches. We will also use the CreateDataLoader class to load the data in the correct format for the model.
 """
-
-# %% [markdown]
-# <div class="alert alert-info">
-#
-# ### Task 1.2
-#
-# Setup the data loader and log several batches to tensorboard.
-#
-# Based on the tensorboard images, what are the two channels in the target image?
-#
-# Note: If tensorboard is not showing images, try refreshing and using the "Images" tab.
-# </div>
-
 # %%
-# Define a function to write a batch to tensorboard log.
+# Initialize the Dataset and Dataloaders.
 
-def log_batch_tensorboard(batch, batchno, writer, card_name):
-    """
-    Logs a batch of images to TensorBoard.
+## Define Dataset & Dataloader options.
+dataset_opt = {}
+dataset_opt["--dataroot"] = output_image_folder
+dataset_opt["--data_type"] = "16" # Data type of the images.
+dataset_opt["--loadSize"] = "512" # Size of the loaded phase image.
+dataset_opt["--target"] = "nuclei" # or "cyto" depending on your choice of target for virtual stain.
+dataset_opt["--input_nc"] = "1" # Number of input channels.
+dataset_opt["--output_nc"] = "1" # Number of output channels.
+dataset_opt["--resize_or_crop"] = "none" # Scaling and cropping of images at load time [resize_and_crop|crop|scale_width|scale_width_and_crop|none].
 
-    Args:
-        batch (dict): A dictionary containing the batch of images to be logged.
-        writer (SummaryWriter): A TensorBoard SummaryWriter object.
-        card_name (str): The name of the card to be displayed in TensorBoard.
+# Update opt with key value pairs from dataset_opt.
+opt.__dict__.update(dataset_opt)
 
-    Returns:
-        None
-    """
-    batch_phase = batch["source"][:, :, 0, :, :]  # batch_size x z_size x Y x X tensor.
-    batch_membrane = batch["target"][:, 1, 0, :, :].unsqueeze(
-        1
-    )  # batch_size x 1 x Y x X tensor.
-    batch_nuclei = batch["target"][:, 0, 0, :, :].unsqueeze(
-        1
-    )  # batch_size x 1 x Y x X tensor.
+# Load Training Set for input into model
+train_dataloader = CreateDataLoader(opt)
+dataset_train = train_dataloader.load_data()
+print(f"Total Training Images = {len(train_dataloader)}")
 
-    p1, p99 = np.percentile(batch_membrane, (0.1, 99.9))
-    batch_membrane = np.clip((batch_membrane - p1) / (p99 - p1), 0, 1)
+# Load Val Set
+opt.phase = "val"
+val_dataloader = CreateDataLoader(opt)
+dataset_val = val_dataloader.load_data()
+print(f"Total Validation Images = {len(val_dataloader)}")
 
-    p1, p99 = np.percentile(batch_nuclei, (0.1, 99.9))
-    batch_nuclei = np.clip((batch_nuclei - p1) / (p99 - p1), 0, 1)
-
-    p1, p99 = np.percentile(batch_phase, (0.1, 99.9))
-    batch_phase = np.clip((batch_phase - p1) / (p99 - p1), 0, 1)
-
-    [N, C, H, W] = batch_phase.shape
-    interleaved_images = torch.zeros((3 * N, C, H, W), dtype=batch_phase.dtype)
-    interleaved_images[0::3, :] = batch_phase
-    interleaved_images[1::3, :] = batch_nuclei
-    interleaved_images[2::3, :] = batch_membrane
-
-    grid = torchvision.utils.make_grid(interleaved_images, nrow=3)
-
-    # add the grid to tensorboard
-    writer.add_image(card_name, grid, batchno)
-
-
-# %%
-# Define a function to visualize a batch on jupyter, in case tensorboard is finicky 
-
-def log_batch_jupyter(batch):
-    """
-    Logs a batch of images on jupyter using ipywidget.
-
-    Args:
-        batch (dict): A dictionary containing the batch of images to be logged.
-
-    Returns:
-        None
-    """
-    batch_phase = batch["source"][:, :, 0, :, :]  # batch_size x z_size x Y x X tensor.
-    batch_size = batch_phase.shape[0]
-    batch_membrane = batch["target"][:, 1, 0, :, :].unsqueeze(
-        1
-    )  # batch_size x 1 x Y x X tensor.
-    batch_nuclei = batch["target"][:, 0, 0, :, :].unsqueeze(
-        1
-    )  # batch_size x 1 x Y x X tensor.
-
-    p1, p99 = np.percentile(batch_membrane, (0.1, 99.9))
-    batch_membrane = np.clip((batch_membrane - p1) / (p99 - p1), 0, 1)
-
-    p1, p99 = np.percentile(batch_nuclei, (0.1, 99.9))
-    batch_nuclei = np.clip((batch_nuclei - p1) / (p99 - p1), 0, 1)
-
-    p1, p99 = np.percentile(batch_phase, (0.1, 99.9))
-    batch_phase = np.clip((batch_phase - p1) / (p99 - p1), 0, 1)
-
-    plt.figure()
-    fig, axes = plt.subplots(batch_size, n_channels, figsize=(10, 10))
-    [N, C, H, W] = batch_phase.shape
-    for sample_id in range(batch_size):
-        axes[sample_id, 0].imshow(batch_phase[sample_id,0])
-        axes[sample_id, 1].imshow(batch_nuclei[sample_id,0])
-        axes[sample_id, 2].imshow(batch_membrane[sample_id,0])
-
-        for i in range(n_channels):
-            axes[sample_id, i].axis("off")
-            axes[sample_id, i].set_title(dataset.channel_names[i])
-    plt.tight_layout()
-    plt.show()
-
-
-# %%
-
-# Initialize the data module.
-
-BATCH_SIZE = 4
-# 42 is a perfectly reasonable batch size. After all, it is the answer to the ultimate question of life, the universe and everything.
-# More seriously, batch size does not have to be a power of 2.
-# See: https://sebastianraschka.com/blog/2022/batch-size-2.html
-
-data_module = HCSDataModule(
-    data_path,
-    source_channel="Phase",
-    target_channel=["Nuclei", "Membrane"],
-    z_window_size=1,
-    split_ratio=0.8,
-    batch_size=BATCH_SIZE,
-    num_workers=8,
-    architecture="2D",
-    yx_patch_size=(512, 512),  # larger patch size makes it easy to see augmentations.
-    augment=False,  # Turn off augmentation for now.
-)
-data_module.setup("fit")
-
-print(
-    f"FOVs in training set: {len(data_module.train_dataset)}, FOVs in validation set:{len(data_module.val_dataset)}"
-)
-train_dataloader = data_module.train_dataloader()
-
-# Instantiate the tensorboard SummaryWriter, logs the first batch and then iterates through all the batches and logs them to tensorboard.
-
-writer = SummaryWriter(log_dir=f"{log_dir}/view_batch")
-# Draw a batch and write to tensorboard.
-batch = next(iter(train_dataloader))
-log_batch_tensorboard(batch, 0, writer, "augmentation/none")
-writer.close()
-
-
-# %% [markdown]
-# Visualize directly on Jupyter ☄️, if your tensorboard is causing issues.
-
-# %%
-%matplotlib inline
-log_batch_jupyter(batch)
+writer = SummaryWriter(log_dir=f"{opt.checkpoints_dir}/view_batch")
 
 # %% [markdown]
 """
-## View augmentations using tensorboard.
+## Configure Pix2PixHD GAN and train to predict nuclei from phase.
+Having loaded the data into the model we can now train the Pix2PixHD GAN to predict nuclei from phase. We will use the following hyperparameters to train the model:
+
 """
 # %%
-# Here we turn on data augmentation and rerun setup
-data_module.augment = True
-data_module.setup("fit")
+model_opt = {}
 
-# get the new data loader with augmentation turned on
-augmented_train_dataloader = data_module.train_dataloader()
+# Define the parameters for the Generator.
+model_opt["--ngf"] = "64" # Number of filters in the generator.
+model_opt["--n_downsample_global"] = "4" # Number of downsampling layers in the generator.
+model_opt["--n_blocks_global"] = "9" # Number of residual blocks in the generator.
+model_opt["--n_blocks_local"] = "3" # Number of residual blocks in the generator.
+model_opt["--n_local_enhancers"] = "1" # Number of local enhancers in the generator.
 
-# Draw batches and write to tensorboard
-writer = SummaryWriter(log_dir=f"{log_dir}/view_batch")
-augmented_batch = next(iter(augmented_train_dataloader))
-log_batch_tensorboard(augmented_batch, 0, writer, "augmentation/some")
-writer.close()
+# Define the parameters for the Discriminators.
+model_opt["--num_D"] = "3" # Number of discriminators.
+model_opt["--n_layers_D"] = "3" # Number of layers in the discriminator.
+model_opt["--ndf"] = "32" # Number of filters in the discriminator.
 
-# %% [markdown]
-# Visualize directly on Jupyter ☄️
+# Define general training parameters.
+model_opt["--gpu_ids"] = "0" # GPU ids to use. 
+model_opt["--norm"] = "instance" # Normalization layer in the generator.
+model_opt["--use_dropout"] = "" # Use dropout in the generator (fixed at 0.2).
+model_opt["--batchSize"] = "8" # Batch size.
 
-# %%
-log_batch_jupyter(augmented_batch)
+# Update opt with key value pairs from model_opt
+opt.__dict__.update(model_opt)
 
-# %% [markdown]
-# <div class="alert alert-info">
-#
-# ### Task 1.3
-# Can you tell what augmentation were applied from looking at the augmented images in Tensorboard?
-#
-# Check your answer using the source code [here](https://github.com/mehta-lab/VisCy/blob/b89f778b34735553cf155904eef134c756708ff2/viscy/light/data.py#L529).
-# </div>
-
-# %% [markdown]
-"""
-## Train a 2D U-Net model to predict nuclei and membrane from phase.
-
-### Construct a 2D U-Net
-See ``viscy.unet.networks.Unet2D.Unet2d`` ([source code](https://github.com/mehta-lab/VisCy/blob/7c5e4c1d68e70163cf514d22c475da8ea7dc3a88/viscy/unet/networks/Unet2D.py#L7)) for configuration details.
-"""
-# %%
-# Create a 2D UNet.
-GPU_ID = 0
-BATCH_SIZE = 10
-YX_PATCH_SIZE = (512, 512)
+# Initialize the model
+phase2nuclei_model = create_model(opt)
+# Define Optimizers for G and D
+optimizer_G, optimizer_D = phase2nuclei_model.module.optimizer_G, phase2nuclei_model.module.optimizer_D
+# Create a visualizer to perform image processing and visualization
+visualizer = Visualizer(opt)
 
 
-# Dictionary that specifies key parameters of the model.
-phase2fluor_config = {
-    "architecture": "2D",
-    "num_filters": [24, 48, 96, 192, 384],
-    "in_channels": 1,
-    "out_channels": 2,
-    "residual": True,
-    "dropout": 0.1,  # dropout randomly turns off weights to avoid overfitting of the model to data.
-    "task": "reg",  # reg = regression task.
-}
+#Here will first start training a model from scrach however we can continue to train from a previously trained model by setting the following parameters.
+opt.continue_train = False
+if opt.continue_train:
+    iter_path = os.path.join(opt.checkpoints_dir, opt.name, "iter.txt")
+    try:
+        start_epoch, epoch_iter = np.loadtxt(iter_path , delimiter=",", dtype=int)
+    except:
+        start_epoch, epoch_iter = 1, 0
+    print("Resuming from epoch %d at iteration %d" % (start_epoch, epoch_iter))
+else:
+     start_epoch, epoch_iter = 1, 0
 
-phase2fluor_model = VSUNet(
-    model_config=phase2fluor_config.copy(),
-    batch_size=BATCH_SIZE,
-    loss_function=torch.nn.functional.l1_loss,
-    schedule="WarmupCosine",
-    log_num_samples=5,  # Number of samples from each batch to log to tensorboard.
-    example_input_yx_shape=YX_PATCH_SIZE,
-)
+# Define helper values for training
+total_steps = (start_epoch-1) * (len(train_dataloader)+len(val_dataloader)) + epoch_iter 
+display_delta = total_steps % opt.display_freq
+print_delta = total_steps % opt.print_freq
+save_delta = total_steps % opt.save_latest_freq
 
+train_model(opt, phase2nuclei_model, visualizer, dataset_train, dataset_val, optimizer_G, optimizer_D, total_steps, start_epoch, epoch_iter, iter_path, display_delta, print_delta, save_delta, writer)
 
 # %% [markdown]
 """
-### Instantiate data module and trainer, test that we are setup to launch training.
-"""
-# %%
-# Setup the data module.
-phase2fluor_data = HCSDataModule(
-    data_path,
-    source_channel="Phase",
-    target_channel=["Nuclei", "Membrane"],
-    z_window_size=1,
-    split_ratio=0.8,
-    batch_size=BATCH_SIZE,
-    num_workers=8,
-    architecture="2D",
-    yx_patch_size=YX_PATCH_SIZE,
-    augment=True,
-)
-phase2fluor_data.setup("fit")
-# fast_dev_run runs a single batch of data through the model to check for errors.
-trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID], fast_dev_run=True)
 
-# trainer class takes the model and the data module as inputs.
-trainer.fit(phase2fluor_model, datamodule=phase2fluor_data)
+## A heads up of what to expect from the training (more detail about this in the following section)...
+
+The train_model function has been designed so you can see the different Pix2PixHD GAN loss components discussed in the first part of the exercise as well as additional performance measurements. As previously mentioned, Pix2PixHD GAN has two networks; a generator and a discriminator. The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)). After a we have iterated through all the training data, we validate the performance of the network on the validation dataset. 
+
+In light of this, we plot the discriminator probabilities of real (D_real) and fake (D_fake) images, for the training and validation datasets.
+
+Both networks are also trained using the feature matching loss (Generator_GAN_Loss_Feat), which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.
+
+In our implementation, in addition to the Pix2PixHD GAN loss components already described we stabalize the GAN training by additing an additional least-square loss term. This term stabalizes the training of the GAN by penalizing the generator for producing images that the discriminator is very confident (high probability) are fake. This loss term is added to the generator loss and is used to train the generator to produce images that are similar to the real images.
+We plot the least-square loss (Generator_Loss_GAN) for the training and validation sets together to observe the performance and how the model is fitting the data.
+This implementation allows for the turning on/off of the least-square loss term by setting the --no_lsgan flag to the model options. As well as the turning off of the feature matching loss term by setting the --no_ganFeat_loss flag to the model options and the turning off of the VGG loss term by setting the --no_vgg_loss flag to the model options. Something you might want to explore in the next section!
+
+Finally, we also plot the Peak-Signal-to-Noise-Ratio (PSNR) and the Structural Similarity Index Measure (SSIM) for the training and validation sets together to observe the performance and how the model is fitting the data.
+
+[PSNR](https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio), is a widely used metric to assess the quality of the generated image compared to the target image. Formally. it measures the ratio between the maximum possible power of a signal and the power of the corrupting noise that affects the fidelity of its representation. Essentially, PSNR provides a quantitative measurement of the quality of an image after compression or other processing such as image translation. Unlike the Pearson-Coeffecient, when measuring how much the pixel values of the virtual stain deviate from the target nuceli stain the score is sensitive to changes in brightness and contrast which is required for necessary for evaluating virtual staining. PSNR values range from 0dB to upper bounds that rarely exceed 60 dB. Extremely high PSNR values (above 50 dB) typically indicate almost negligible differences between the images.
 
 
-# %% [markdown]
-# ## View model graph.
-#
-# PyTorch uses dynamic graphs under the hood. The graphs are constructed on the fly. This is in contrast to TensorFlow, where the graph is constructed before the training loop and remains static. In other words, the graph of the network can change with every forward pass. Therefore, we need to supply an input tensor to construct the graph. The input tensor can be a random tensor of the correct shape and type. We can also supply a real image from the dataset. The latter is more useful for debugging.
+[SSIM](https://en.wikipedia.org/wiki/Structural_similarity), is a perceptual metric used to measure the similarity between two images. Unlike PSNR, which focuses on pixel-wise differences, SSIM evaluates image quality based on perceived changes in structural information, luminance, and contrast. SSIM values range from -1 to 1, where 1 indicates perfect similarity between the images. SSIM is a more robust metric than PSNR, as it takes into account the human visual system"s sensitivity to structural information and contrast. SSIM is particularly useful for evaluating the quality of image translation models, as it provides a more accurate measure of the perceptual similarity between the generated and target images.
 
-# %% [markdown]
-# <div class="alert alert-info">
-#
-# ### Task 1.4
-# Run the next cell to generate a graph representation of the model architecture. Can you recognize the UNet structure and skip connections in this graph visualization?
-# </div>
-
-# %%
-# visualize graph of phase2fluor model as image.
-model_graph_phase2fluor = torchview.draw_graph(
-    phase2fluor_model,
-    phase2fluor_data.train_dataset[0]["source"],
-    depth=2,  # adjust depth to zoom in.
-    device="cpu",
-)
-# Print the image of the model.
-model_graph_phase2fluor.visual_graph
-
-# %% [markdown]
-"""
-<div class="alert alert-info">
-
-### Task 1.5
-Start training by running the following cell. Check the new logs on the tensorboard.
-</div>
 """
 
-
-# %%
-
-GPU_ID = 0
-n_samples = len(phase2fluor_data.train_dataset)
-steps_per_epoch = n_samples // BATCH_SIZE  # steps per epoch.
-n_epochs = 50 # Set this to 50 or the number of epochs you want to train for.
-
-trainer = VSTrainer(
-    accelerator="gpu",
-    devices=[GPU_ID],
-    max_epochs=n_epochs,
-    log_every_n_steps=steps_per_epoch // 2,
-    # log losses and image samples 2 times per epoch.
-    logger=TensorBoardLogger(
-        save_dir=log_dir,
-        # lightning trainer transparently saves logs and model checkpoints in this directory.
-        name="phase2fluor",
-        log_graph=True,
-        ),
-    )  
-# Launch training and check that loss and images are being logged on tensorboard.
-trainer.fit(phase2fluor_model, datamodule=phase2fluor_data)
 
 # %% [markdown]
 """
 <div class="alert alert-success">
 
-## Checkpoint 1
+## Load Pre-trained Nuclei or Cyto model
 
-Now the training has started,
-we can come back after a while and evaluate the performance!
+As we were limited on time, we decided that it would be most benefitial to you so load a pre-trained Pix2PixGAN. This will allow you to explore the different loss components and understand how the model trains and performs.
 </div>
 """
+# %% Imports and paths tags=[]
+log_dir = "/PATH/TO/PRETRAINED_MODEL/TENSORBOAD/OUTPUTS"
+%reload_ext tensorboard
+%tensorboard --logdir {log_dir} 
 
-# %% <a [markdown] id='1_fluor2phase'></a>
+# %% <a [markdown] id="1_fluor2phase"></a>
+# Add in screenshots of what to expect from to see in tensorboard here (should be able to do this tomorrow AM)
 """
-# Part 2: Assess previous model, train fluorescence to phase contrast translation model.
+# Part 2: Assess trained Pix2PixGAN using tensorboard, discuss and trial new hyper-parameter configurations.
 --------------------------------------------------
+Learning goals:
+- Understand the loss components of Pix2PixHD GAN and how they are used to train the model.
+- Evaluate the fit of the model on the train and validation datasets.
+
+In this part, we will evaluate the performance of the pre-trained model as shown in the previous part. We will begin by looking qualitatively at the model predictions, then dive into the different loss curves, as well as the SSIM and PSNR scores achieves on the validation set. We will also train another model to see if we can improve the performance of the model.
+
+We first copy the same model parameters as the pre-trained model.
 """
+# %%
+model_opt = {}
+
+# Define the parameters for the Generator.
+model_opt["--ngf"] = "64" # Number of filters in the generator.
+model_opt["--n_downsample_global"] = "4" # Number of downsampling layers in the generator.
+model_opt["--n_blocks_global"] = "9" # Number of residual blocks in the generator.
+model_opt["--n_blocks_local"] = "3" # Number of residual blocks in the generator.
+model_opt["--n_local_enhancers"] = "1" # Number of local enhancers in the generator.
+
+# Define the parameters for the Discriminators.
+model_opt["--num_D"] = "3" # Number of discriminators.
+model_opt["--n_layers_D"] = "3" # Number of layers in the discriminator.
+model_opt["--ndf"] = "32" # Number of filters in the discriminator.
+
+# Define general training parameters.
+model_opt["--gpu_ids"] = "0" # GPU ids to use. 
+model_opt["--norm"] = "instance" # Normalization layer in the generator.
+model_opt["--use_dropout"] = "" # Use dropout in the generator (fixed at 0.2).
+model_opt["--batchSize"] = "8" # Batch size.
+
+#Define loss functions.
+model_opt["--no_vgg_loss"] = "" # Turn off VGG loss
+model_opt["--no_ganFeat_loss"] = "" # Turn off feature matching loss
+model_opt["--no_lsgan"] = "" # Turn off least square loss
+# Update opt with key value pairs from model_opt
+opt.__dict__.update(model_opt)
+
+# Initialize the model
+phase2nuclei_model = create_model(opt)
+# Define Optimizers for G and D
+optimizer_G, optimizer_D = phase2nuclei_model.module.optimizer_G, phase2nuclei_model.module.optimizer_D
+
+# Remeber to create a new name for the model outputs
+opt.name = "dlmbl_vsnuclei_v2"
+opt.checkpoints_dir = Path(f"~/data/04_image_translation/{opt.name}/logs/").expanduser()
+
+# Retrain model with new hyperparameters
+train_model(opt, phase2nuclei_model, visualizer, dataset_train, dataset_val, optimizer_G, optimizer_D, total_steps, start_epoch, epoch_iter, iter_path, display_delta, print_delta, save_delta, writer)
 
 # %% [markdown]
 """
-We now look at some metrics of performance of previous model. We typically evaluate the model performance on a held out test data. We will use the following metrics to evaluate the accuracy of regression of the model:
-- [Person Correlation](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient).
-- [Structural similarity](https://en.wikipedia.org/wiki/Structural_similarity) (SSIM).
+## Qualitative evaluation:
 
-You should also look at the validation samples on tensorboard (hint: the experimental data in nuclei channel is imperfect.)
+We have visualised the model output for an unseen phase contrast image and the target, nuclei stain.
+
+- What do you notice about the virtual staining predictions? Are they realistic? How does the sharpness and visual representation compare to the regression-based approach?
+
+- What
+
+- What do you notice about the translation of the background pixels compared the translation of the instance pixels?
+
+## Quantitative evaluation:
+
+- What do you notice about the probabilities (real vs fake) of the discriminators? How do the values compare during training compared to validation?
+
+- What do you notice about the feature matching L1 loss?
+
+- What do you notice about the least-square loss?
+
+- What do you notice about the PSNR and SSIM scores? Are we over or underfitting at all?
+
+## Hyperparameter tuning:
+
+We will train another model to see if we can improve the performance of the model. We will try to increase the number of filters in the generator and discriminator, and decrease the learning rate. We will also try to turn off the least square loss term and see how it affects the performance of the model.
+
+- Do you notice any changes? 
+- How do the different loss components change with the new hyperparameters? 
+- How does the model performance change with the new hyperparameters?
+
 """
+
+## View the training progress of hyper-parameter changes in tensorboard.
+# %% Imports and paths tags=[]
+%reload_ext tensorboard
+%tensorboard --logdir {opt.checkpoints_dir} 
 
 # %% [markdown]
 """
-<div class="alert alert-info">
+# Part 3: Evaluate performance of the virtual staining.
+--------------------------------------------------
+## Evaluate the performance of the model.
+We now look at the same metrics of performance of the previous model. We typically evaluate the model performance on a held out test data. 
 
-### Task 2.1 Define metrics
+We will first load the test data using the same format as the training and validation data. We will then use the model to predict the nuclei channel from the phase image. We will then evaluate the performance of the model using the following metrics:
 
-For each of the above metrics, write a brief definition of what they are and what they mean for this image translation task.
+Pixel-level metrics:
+- [Peak-Signal-to-Noise-Ratio (PSNR)](https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio).
+- [Structural Similarity Index Measure (SSIM)](https://en.wikipedia.org/wiki/Structural_similarity).
 
-</div>
+Instance-level metrics:
+- [F1 score](https://en.wikipedia.org/wiki/F1_score). via [Cellpose](https://cellpose.org/).
 """
-
-# %% [markdown]
-# ```
-# #######################
-# ##### Todo ############
-# #######################
-# ```
-#
-# - Pearson Correlation:
-#
-# - Structural similarity: 
 
 # %% Compute metrics directly and plot here.
-test_data_path = Path(
-    "~/data/04_image_translation/HEK_nuclei_membrane_test.zarr"
-).expanduser()
+opt = TestOptions().parse(save=False)
+test_data_path = output_image_folder
 
-test_data = HCSDataModule(
-    test_data_path,
-    source_channel="Phase",
-    target_channel=["Nuclei", "Membrane"],
-    z_window_size=1,
-    batch_size=1,
-    num_workers=8,
-    architecture="2D",
-)
-test_data.setup("test")
+opt.nThreads = 1   # test code only supports nThreads = 1
+opt.batchSize = 1  # test code only supports batchSize = 1
+opt.serial_batches = True  # no shuffle
+opt.no_flip = True  # no flip
+
+inference_opt = {}
+    
+# Ensure the parameters below align with trained model
+opt.__dict__.update(model_opt)
+opt.__dict__.update(dataset_opt)
+
+# Additional Inference parameters
+inference_opt["--how_many"] = "144"
+inference_opt["--checkpoints_dir"] "/PATH/TO/PRETRAINED_MODEL/"
+inference_opt["--results_dir"] = f"~/data/04_image_translation/{opt.name}/"
+inference_opt["--which_epoch"] = "latest" # or specify the epoch number "40"
+inference_opt["--phase"] = "test"
+opt.__dict__.update(inference_opt)
+
+Path(opt.results_dir).mkdir(parents=True, exist_ok=True)
+test_data_loader = CreateDataLoader(opt)
+test_dataset = test_data_loader.load_data()
+visualizer = Visualizer(opt)
+
+#Load pre-trained model
+model = create_model(opt)
+
+# Generate & save predictions in the results directory.
+inference_model(test_dataset, opt, model)
+
 
 test_metrics = pd.DataFrame(
-    columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
+    columns=["psnr_nuc", "SSIM_nuc"]
 )
-
-
-def min_max_scale(input):
-    return (input - np.min(input)) / (np.max(input) - np.min(input))
-
 
 # %% Compute metrics directly and plot here.
 for i, sample in enumerate(test_data.test_dataloader()):
@@ -708,7 +547,7 @@ model_graph_fluor2phase.visual_graph
 
 ### Task 2.3
 
-While your model is training, let's think about the following questions:
+While your model is training, let"s think about the following questions:
 - What is the information content of each channel in the dataset?
 - How would you use image translation models?
 - What can you try to improve the performance of each model?
@@ -778,7 +617,7 @@ When your model finishes training, please summarize hyperparameters and performa
 </div>
 """
 
-# %% <a [markdown] id='3_tuning'></a> tags=[]
+# %% <a [markdown] id="3_tuning"></a> tags=[]
 """
 # Part 3: Tune the models.
 --------------------------------------------------
@@ -920,6 +759,6 @@ trainer.fit(phase2fluor_slow_model, datamodule=phase2fluor_data)
 ## Checkpoint 3
 
 Congratulations! You have trained several image translation models now!
-Please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models and add the final perforance in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z). We'll discuss our combined results as a group.
+Please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models and add the final perforance in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z). We"ll discuss our combined results as a group.
 </div>
 """
