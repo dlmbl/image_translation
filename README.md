@@ -1,12 +1,12 @@
-# Exercise 4: Image translation
+# Exercise 4: Image translation via Generative Modelling
 ## Setup
 
 Make sure that you are inside of the `image_translation` folder by using the `cd` command to change directories if needed.
 
-Make sure that you can use mamba to switch environments.
+Make sure that you can use conda to switch environments.
 
 ```bash
-mamba init
+conda init
 ```
 
 **Close your shell, and login again.** 
@@ -17,7 +17,7 @@ sh setup.sh
 ```
 Activate your environment
 ```bash
-mamba activate 04_image_translation
+conda activate 04_image_translation
 ```
 
 Launch a jupyter environment
