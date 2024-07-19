@@ -1,56 +1,57 @@
-# %% [markdown] tags=["pix2pixGAN_explainer"]
+# %% [markdown]
 """
-# Generative Modelling Approaches to Image translation
+# A Generative Modelling Approach to Image translation
 ---
 
 Written by Samuel Tonks, Krull Lab, University of Birmingham, UK.<br><br>
 
-In this part of the exercise, we will approach the same supervised image-to-image translation task as in the previous parts, but using a different model architecture. Here we will explore a generative modelling approach; a conditional Generative Adversarial Network (cGAN). <br><br>
+In this part of the exercise, we will approach the same supervised image-to-image translation task as in the previous parts, but using a different model architecture. Here we will explore a generative modelling approach; a conditional Generative Adversarial Network (cGAN). <br>
 
-In contrast to formulating the task as a regression problem where the model produces a single deterministic output, cGANs learn to map from the source domain to a target domain distribution. This learnt distribution can then be sampled from to produce virtual staining predictions that are no longer a compromise between possible solutions which can lead to improved sharpness and realism in the generated images.<br><br>
+In contrast to formulating the task as a regression problem where the model produces a single deterministic output, cGANs learn to map from the source domain to a target domain distribution. This learnt distribution can then be sampled from to produce virtual staining predictions that are no longer a compromise between possible solutions which can lead to improved sharpness and realism in the generated images.<br>
 
-At a high-level a cGAN has two networks; a generator and a discriminator. The generator is a fully convolutional network that takes the source image as input and outputs the target image. The discriminator is also a fully convolutional network that takes as input the source image concatentated with a real or fake image and outputs the probabilities of whether the image is real or fake as shown in the Figure below: 
-[cGAN](https://github.com/Tonks684/image_translation/tree/main/imgs/GAN.svg)
-<br><br>
-The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)).<br><br>
+At a high-level a cGAN has two networks; a generator and a discriminator. The generator is a fully convolutional network that takes the source image as input and outputs the target image. The discriminator is also a fully convolutional network that takes as input the source image concatentated with a real or fake image and outputs the probabilities of whether the image is real or fake as shown in the Figure below:
 
-We will be exploring [Pix2PixHD GAN](https://arxiv.org/abs/1711.11585) architecture, a high-resolution extension of a traditional cGAN adapted for our recent [virtual staining works](https://ieeexplore.ieee.org/abstract/document/10230501?casa_token=NEyrUDqvFfIAAAAA:tklGisf9BEKWVjoZ6pgryKvLbF6JyurOu5Jrgoia1QQLpAMdCSlP9gMa02f3w37PvVjdiWCvFhA). Pix2PixHD GAN improves upon the traditional cGAN by using a coarse-to-fine generator, a multi-scale discrimator and additional loss terms. The "coarse-to-fine" generator is composed of two sub-networks, both ResNet architectures that operate at different scales. The first sub-network (G1) generates a low-resolution image, which is then upsampled and concatenated with the source image to produce a higher resolution image. The multi-scale discriminator is composed of 3 networks that operate at different scales, each network is trained to distinguish between real and fake images at that scale. The generator is trained to fool the discriminator at each scale. The additional loss terms include a feature matching loss, which encourages the generator to produce images that are similar to the real images at each scale. <br><br>
-[1](https://github.com/Tonks684/image_translation/tree/main/imgs/Pix2PixHD_1.svg)
-[1](https://github.com/Tonks684/image_translation/tree/main/imgs/Pix2PixHD_2.svg)
+![Overview of cGAN](https://github.com/Tonks684/dlmbl_material/tree/main/imgs/GAN.jpg)
+<br>
+The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)).<br>
+
+We will be exploring [Pix2PixHD GAN](https://arxiv.org/abs/1711.11585) architecture, a high-resolution extension of a traditional cGAN adapted for our recent [virtual staining works](https://ieeexplore.ieee.org/abstract/document/10230501?casa_token=NEyrUDqvFfIAAAAA:tklGisf9BEKWVjoZ6pgryKvLbF6JyurOu5Jrgoia1QQLpAMdCSlP9gMa02f3w37PvVjdiWCvFhA). Pix2PixHD GAN improves upon the traditional cGAN by using a coarse-to-fine generator, a multi-scale discrimator and additional loss terms. The "coarse-to-fine" generator is composed of two sub-networks, both ResNet architectures that operate at different scales. The first sub-network (G1) generates a low-resolution image, which is then upsampled and concatenated with the source image to produce a higher resolution image. The multi-scale discriminator is composed of 3 networks that operate at different scales, each network is trained to distinguish between real and fake images at that scale. The generator is trained to fool the discriminator at each scale. The additional loss terms include a feature matching loss, which encourages the generator to produce images that are similar to the real images at each scale. <br>
+![Pix2PixGAN ](https://github.com/Tonks684/image_translation/tree/main/imgs/Pix2PixHD_1.jpg)
+![Feature Matching Loss Pix2PixHD GAN](https://github.com/Tonks684/image_translation/tree/main/imgs/Pix2PixHD_2.jpg)
 """
 
 
 # %% [markdown]
 """
-Today, we will train a 2D image translation model using the Pix2PixHD GAN. We will use the same dataset of 301 fields of view (FOVs) of Human Embryonic Kidney (HEK) cells, each FOV has 3 channels (phase, membrane, and nuclei) as used in the previous section.<br><br>
+Today, we will train a 2D image translation model using the Pix2PixHD GAN. We will use the same dataset of 301 fields of view (FOVs) of Human Embryonic Kidney (HEK) cells, each FOV has 3 channels (phase, membrane, and nuclei) as used in the previous section.<br>
 """
 # %% [markdown]
 """
 <div class="alert alert-warning">
-This part of the exercise is organized in 3 parts.<br><br>
+This part of the exercise is organized in 3 parts.<br>
 
-As you have already explored the data in the previous parts, we will focus on training and evaluating Pix2PixHD GAN. The parts are as follows:<br><br>
+As you have already explored the data in the previous parts, we will focus on training and evaluating Pix2PixHD GAN. The parts are as follows:<br>
 
-* **Part 1** - Define dataloaders & walk through steps to train a Pix2PixHD GAN.<br><br>
-* **Part 2** - Load and assess a pre-trained Pix2PixGAN using tensorboard, discuss the different loss components and how new hyper-parameter configurations could impact performance.<br><br>
-* **Part 3** - Evaluate performance of pre-trained Pix2PixGAN using pixel-level and instance-level metrics.<br><br>
-* **Part 4** - Compare the performance of Viscy (regression-based) with Pix2PixHD GAN (generative modelling approach)<br><br>
-* **Part 5** - BONUS: Sample different virtual staining solutions from the GAN using MC-Dropout and explore the uncertainty in the virtual stain predictions.<br><br>
+* **Part 1** - Define dataloaders & walk through steps to train a Pix2PixHD GAN.<br>
+* **Part 2** - Load and assess a pre-trained Pix2PixGAN using tensorboard, discuss the different loss components and how new hyper-parameter configurations could impact performance.<br>
+* **Part 3** - Evaluate performance of pre-trained Pix2PixGAN using pixel-level and instance-level metrics.<br>
+* **Part 4** - Compare the performance of Viscy (regression-based) with Pix2PixHD GAN (generative modelling approach)<br>
+* **Part 5** - BONUS: Sample different virtual staining solutions from the GAN using MC-Dropout and explore the uncertainty in the virtual stain predictions.<br>
 </div>
 """
 # %% [markdown]
 """
-Our guesstimate is that each of the parts will take ~1 hour. A reasonable Pix2PixHD GAN can be trained in ~1.5 hours on a typical AWS node, this notebook is designed to walk you through the training steps but load a pre-trained model and tensorboard session to ensure we can complete the exercise in the time allocated. During Part 2, you're free to train your own model using the steps we outline in part 1.<br><br>
+Our guesstimate is that each of the parts will take ~1 hour. A reasonable Pix2PixHD GAN can be trained in ~1.5 hours on a typical AWS node, this notebook is designed to walk you through the training steps but load a pre-trained model and tensorboard session to ensure we can complete the exercise in the time allocated. During Part 2 or 3, you're free to train your own model using the steps we outline in part 1.<br>
 
-The focus of this part of the exercise is on understanding a generative modelling approach to image translation, how to train and evaluate a cGAN, and explore some hyperparameters of the cGAN. <br><br>
+The focus of this part of the image_translation session is on understanding a generative modelling approach to image translation, how to train and measure training performance for Pix2PixHD GAN, exploring pixel-level and instance-level metrics for evaluating the performance of the model. In the final section we will compare and discuss the Viscy vs Pix2PixHD GAN results. There is also a bonus part 4 where you can explore the variability in the samples from Pix2PixHD's generator. <br><br>
 """
 # %% [markdown]
 """
 <div class="alert alert-danger">
-Set your python kernel to <span style="color:black;">04_image_translation</span>
+Set your python kernel to <span style="color:black;">04_image_translation_phd</span>
 </div>
 """
-# %% <a [markdown] id="1_phase2fluor"></a>
+# %% <a [markdown]></a>
 """
 # Part 1: Define dataloaders & walk through steps to train a Pix2PixHD GAN.
 ---------
@@ -109,9 +110,9 @@ output_image_folder = Path("~/data/04_image_translation/tiff_files/").expanduser
 # Initalize the tensorboard writer.
 writer = SummaryWriter(log_dir=opt.checkpoints_dir)
 
-# %% [markdown tags=[dataloading]]
+# %% [markdown]
 """
-## 1.1 Load Dataset & Configure Dataloaders.
+## 1.1 Load Dataset & Configure Dataloaders.<br>
 Having already downloaded and split our training, validation and test sets we now need to load the data into the model. We will use the Pytorch DataLoader class to load the data in batches. The DataLoader class is an iterator that provides a consistent way to load data in batches. We will also use the CreateDataLoader class to load the data in the correct format for the Pix2PixHD GAN.
 """
 # %%
@@ -211,30 +212,31 @@ train_model(
 
 # %% [markdown]
 """
-<div class="alert alert-warning">
+<div class="alert alert-info">
 
-## A heads up of what to expect from the training (more detail about this in the following section)...
+## A heads up of what to expect from the training...
+<br>
+The train_model function has been designed so you can see the different Pix2PixHD GAN loss components discussed in the first part of the exercise as well as additional performance measurements. As previously mentioned, Pix2PixHD GAN has two networks; a generator and a discriminator. The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)). After a we have iterated through all the training data, we validate the performance of the network on the validation dataset. <br>
 
-The train_model function has been designed so you can see the different Pix2PixHD GAN loss components discussed in the first part of the exercise as well as additional performance measurements. As previously mentioned, Pix2PixHD GAN has two networks; a generator and a discriminator. The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)). After a we have iterated through all the training data, we validate the performance of the network on the validation dataset. 
+In light of this, we plot the discriminator probabilities of real (D_real) and fake (D_fake) images, for the training and validation datasets.<br>
 
-In light of this, we plot the discriminator probabilities of real (D_real) and fake (D_fake) images, for the training and validation datasets.
-
-Both networks are also trained using the feature matching loss (Generator_GAN_Loss_Feat), which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.
+Both networks are also trained using the feature matching loss (Generator_GAN_Loss_Feat), which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.<br>
 
 In our implementation, in addition to the Pix2PixHD GAN loss components already described we stabalize the GAN training by additing an additional least-square loss term. This term stabalizes the training of the GAN by penalizing the generator for producing images that the discriminator is very confident (high probability) are fake. This loss term is added to the generator loss and is used to train the generator to produce images that are similar to the real images.
-We plot the least-square loss (Generator_Loss_GAN) for the training and validation sets together to observe the performance and how the model is fitting the data.
-This implementation allows for the turning on/off of the least-square loss term by setting the --no_lsgan flag to the model options. As well as the turning off of the feature matching loss term by setting the --no_ganFeat_loss flag to the model options and the turning off of the VGG loss term by setting the --no_vgg_loss flag to the model options. Something you might want to explore in the next section!
 
-Finally, we also plot the Peak-Signal-to-Noise-Ratio (PSNR) and the Structural Similarity Index Measure (SSIM) for the training and validation sets together to observe the performance and how the model is fitting the data.
+We plot the least-square loss (Generator_Loss_GAN) for the training and validation sets together to observe the performance and how the model is fitting the data.<br>
+This implementation allows for the turning on/off of the least-square loss term by setting the --no_lsgan flag to the model options. As well as the turning off of the feature matching loss term by setting the --no_ganFeat_loss flag to the model options. Something you might want to explore in the next section!<br><br>
 
-[PSNR](https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio), is a widely used metric to assess the quality of the generated image compared to the target image. Formally. it measures the ratio between the maximum possible power of a signal and the power of the corrupting noise that affects the fidelity of its representation. Essentially, PSNR provides a quantitative measurement of the quality of an image after compression or other processing such as image translation. Unlike the Pearson-Coeffecient, when measuring how much the pixel values of the virtual stain deviate from the target nuceli stain the score is sensitive to changes in brightness and contrast which is required for necessary for evaluating virtual staining. PSNR values range from 0dB to upper bounds that rarely exceed 60 dB. Extremely high PSNR values (above 50 dB) typically indicate almost negligible differences between the images.
+Finally, we also plot the Peak-Signal-to-Noise-Ratio (PSNR) and the Structural Similarity Index Measure (SSIM) for the training and validation sets together to observe the performance and how the model is fitting the data.<br>
+
+[PSNR](https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio), is a widely used metric to assess the quality of the generated image compared to the target image. Formally. it measures the ratio between the maximum possible power of a signal and the power of the corrupting noise that affects the fidelity of its representation. Essentially, PSNR provides a quantitative measurement of the quality of an image after compression or other processing such as image translation. Unlike the Pearson-Coeffecient, when measuring how much the pixel values of the virtual stain deviate from the target nuceli stain the score is sensitive to changes in brightness and contrast which is required for necessary for evaluating virtual staining. PSNR values range from 0dB to upper bounds that rarely exceed 60 dB. Extremely high PSNR values (above 50 dB) typically indicate almost negligible differences between the images.<br>
 
 
-[SSIM](https://en.wikipedia.org/wiki/Structural_similarity), is a perceptual metric used to measure the similarity between two images. Unlike PSNR, which focuses on pixel-wise differences, SSIM evaluates image quality based on perceived changes in structural information, luminance, and contrast. SSIM values range from -1 to 1, where 1 indicates perfect similarity between the images. SSIM is a more robust metric than PSNR, as it takes into account the human visual system"s sensitivity to structural information and contrast. SSIM is particularly useful for evaluating the quality of image translation models, as it provides a more accurate measure of the perceptual similarity between the generated and target images.
+[SSIM](https://en.wikipedia.org/wiki/Structural_similarity), is a perceptual metric used to measure the similarity between two images. Unlike PSNR, which focuses on pixel-wise differences, SSIM evaluates image quality based on perceived changes in structural information, luminance, and contrast. SSIM values range from -1 to 1, where 1 indicates perfect similarity between the images. SSIM is a more robust metric than PSNR, as it takes into account the human visual system"s sensitivity to structural information and contrast. SSIM is particularly useful for evaluating the quality of image translation models, as it provides a more accurate measure of the perceptual similarity between the generated and target images.<br>
 
 </div>
 """
-# %% [markdown]
+# %% <a [markdown]></a>
 """
 # Part 2: Load & Assess trained Pix2PixGAN using tensorboard, discuss performance of the model.
 --------------------------------------------------
@@ -245,8 +247,9 @@ Learning goals:
 In this part, we will evaluate the performance of the pre-trained model as shown in the previous part. We will begin by looking qualitatively at the model predictions, then dive into the different loss curves, as well as the SSIM and PSNR scores achieves on the validation set. We will also train another model to see if we can improve the performance of the model.
 
 """
+# %%
 translation_task = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
-# %% Imports and paths tags=[]
+
 log_dir = f"~/data/04_image_translation/pretrained_GAN/{opt.name}/"
 %reload_ext tensorboard
 %tensorboard --logdir {$log_dir}
@@ -254,27 +257,26 @@ log_dir = f"~/data/04_image_translation/pretrained_GAN/{opt.name}/"
 # %% [markdown]
 """
 <div class="alert alert-info">
+
 ## Qualitative evaluation:
-
-##### Should I add answers to the questions below? Make it an exercise?
-We have visualised the model output for an unseen phase contrast image and the target, nuclei stain.
-
-- What do you notice about the virtual staining predictions? Are they realistic? How does the sharpness and visual representation compare to the regression-based approach?
-
+<br>
+We have visualised the model output for an unseen phase contrast image and the target, nuclei stain.<br>
+<br>
+- What do you notice about the virtual staining predictions? Are they realistic? How does the sharpness and visual representation compare to the regression-based approach?<br>
 - What do you notice about the translation of the background pixels compared the translation of the instance pixels?
+</div>
+
+<div class="alert alert-info">
 
 ## Quantitative evaluation:
-
-- What do you notice about the probabilities (real vs fake) of the discriminators? How do the values compare during training compared to validation?
-
-- What do you notice about the feature matching L1 loss?
-
-- What do you notice about the least-square loss?
-
-- What do you notice about the PSNR and SSIM scores? Are we over or underfitting at all?
-
+<br>
+- What do you notice about the probabilities (real vs fake) of the discriminators?How do the values compare during training compared to validation?<br>
+- What do you notice about the feature matching L1 loss?<br>
+- What do you notice about the least-square loss?<br>
+- What do you notice about the PSNR and SSIM scores? Are we over or underfitting at all?<br>
 </div>
 """
+# %% [markdown]
 """
 <div class="alert alert-success">
     
@@ -304,7 +306,7 @@ Pixel-level metrics:
 Instance-level metrics:
 - [F1 score](https://en.wikipedia.org/wiki/F1_score). via [Cellpose](https://cellpose.org/).
 """
-# %% <a [markdown]> </a>
+# %%
 
 opt = TestOptions().parse(save=False)
 dataset_opt = {}
