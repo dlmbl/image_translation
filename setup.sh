@@ -18,7 +18,7 @@ conda env create -f ./pix2pixHDCUDA11_environment.yml
 source activate pix2pixHD_CUDA11
 
 # Install additional packages
-conda install -y ipykernel nbformat nbconvert black jupytext ipywidgets --name pix2pixHD_CUDA11
+conda install -y ipykernel nbformat nbconvert black jupytext ipywidgets --name 04_image_translation_phd
 
 # Return to the previous directory
 cd ../../
