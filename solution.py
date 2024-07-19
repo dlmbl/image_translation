@@ -288,6 +288,7 @@ Congratulations! You should now have a better understanding of how a conditional
 """
 # %% [markdown]
 """
+
 # Part 3: Evaluate performance of the virtual staining on unseen data.
 --------------------------------------------------
 ## Evaluate the performance of the model.
@@ -376,19 +377,9 @@ inference_model(test_dataset, opt, model)
 
 # Gather results for evaluation
 virtual_stain_paths = sorted([i for i in Path(opt.results_dir).glob("**/*.tiff")])
-target_stain_paths = sorted(
-    [
-        i
-        for i in Path(f"{output_image_folder}/{translation_task}/test/").glob(
-            "**/*.tiff"
-        )
-    ]
-)
-phase_paths = sorted(
-    [i for i in Path(f"{output_image_folder}/input/test/").glob("**/*.tiff")]
-)
-assert (
-    len(virtual_stain_paths) == len(target_stain_paths) == len(phase_paths)
+target_stain_paths = sorted([i for i in Path(f"{output_image_folder}/{translation_task}/test/").glob("**/*.tiff")])
+phase_paths = sorted([i for i in Path(f"{output_image_folder}/input/test/").glob("**/*.tiff")])
+assert (len(virtual_stain_paths) == len(target_stain_paths) == len(phase_paths)
 ), "Number of images do not match."
 
 # Create arrays to store the images.
@@ -416,11 +407,11 @@ for index, (v_path, t_path, p_path) in tqdm(
 Create a matplotlib plot that visalises random samples of the phase images, target stains, and virtual stains.
 </div>
 """
+
 # %% tags=["task"]
 ##########################
 ######## TODO ########
 ##########################
-
 
 def visualise_results():
     # Your code here
@@ -435,21 +426,24 @@ def visualise_results():
 
 
 def visualise_results(
-    phase_images: np.array, target_stains: np.array, virtual_stains: np.array
+    phase_images: np.array, target_stains: np.array, virtual_stains: np.array, crop_size=None
 ):
     """
-    Visualizes the results of the staining process by displaying the phase images, target stains, and virtual stains.
+    Visualizes the results of the image processing algorithm.
 
     Args:
-        phase_images (np.array): Array of phase images with shape (N, H, W).
-        target_stains (np.array): Array of target stains with shape (N, H, W).
-        virtual_stains (np.array): Array of virtual stains with shape (N, H, W).
-
-    Returns:
-        None
+        phase_images (np.array): Array of phase images.
+        target_stains (np.array): Array of target stain images.
+        virtual_stains (np.array): Array of virtual stain images.
+        crop_size (int, optional): Size of the crop. Defaults to None.
     """
+
     fig, axes = plt.subplots(5, 3, figsize=(15, 15))
     sample_indices = np.random.choice(len(phase_images), 5)
+    if crop is not None:
+        phase_images = phase_images[:,:crop_size,:crop_size]
+        target_stains = target_stains[:,:crop_size,:crop_size]
+        virtual_stains = virtual_stains[:,:crop_size,:crop_size]
     for i, idx in enumerate(sample_indices):
         axes[i, 0].imshow(phase_images[idx], cmap="gray")
         axes[i, 0].set_title("Phase")
@@ -473,8 +467,6 @@ def visualise_results(
     plt.tight_layout()
     plt.show()
 
-
-test_metrics = pd.DataFrame(columns=["pearson_nuc", "SSIM_nuc", "psnr_nuc"])
 # %% [markdown] tags=[]
 """
 <div class="alert alert-info">
@@ -484,6 +476,8 @@ test_metrics = pd.DataFrame(columns=["pearson_nuc", "SSIM_nuc", "psnr_nuc"])
 Compute the pixel-level metrics for the virtual stains and target stains. The metrics include Pearson correlation, SSIM, and PSNR.
 </div>
 """
+
+test_metrics = pd.DataFrame(columns=["pearson_nuc", "SSIM_nuc", "psnr_nuc"])
 # Pixel-level metrics
 for i, (target_image, predicted_image) in enumerate(zip(target_stains, virtual_stains)):
     # Compute SSIM and pearson correlation.
@@ -517,9 +511,9 @@ test_metrics.boxplot(
 
 </div>
 """
-# %% [markdown] tags=[]
-
+# %% markdown
 # Run cellpose to generate masks for the virtual stains
+# %%
 path_to_virtual_stain = Path(opt.results_dir)
 path_to_targets = Path(f"{output_image_folder}/test/")
 cellpose_model = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
@@ -531,8 +525,10 @@ predicted_masks = sorted([i for i in path_to_predictions.glob("**/*_cp_masks.tif
 target_masks = sorted([ifor i in Path(path_to_targets).glob("**/*_cp_masks.tif*")])
 assert len(predicted_masks) == len(target_masks), "Number of masks do not match."
 
+# %% [markdown]
 # Use a predefined function to compute F1 score and its component parts.
-# %% [markdown] tags=[]
+
+# %%
 # Generate dataframe to store the outputs
 results = pd.DataFrame(
     columns=[
@@ -579,9 +575,75 @@ Congratulations! You have trained several image translation models now!
 Please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models and add the final perforance in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z). We"ll discuss our combined results as a group.
 </div>
 """
+
 # %% [markdown]
 """
-# Part 4: BONUS: Sample different virtual staining solutions from the GAN using MC-Dropout and explore the uncertainty in the virtual stain predictions.
+# Part 4. Compare the performance of Viscy (regression-based) with Pix2PixHD GAN (generative modelling approach)
+--------------------------------------------------
+"""
+# %% tags=["task"]
+# Load Viscy Virtual Stains
+viscy_results_path = "/ADD/PATH/TO/RESULTS/HERE"
+viscy_stain_paths = sorted([i for i in Path(viscy_results_path).glob("**/*.tiff")])
+assert len(viscy_stain_paths) == len(virtual_stain_paths), "Number of images do not match."
+visy_stains = np.zeros((len(viscy_stain_paths), 512, 512))
+for index, v_path in enumerate(viscy_stain_paths):
+    viscy_stain = imread(v_path)
+    visy_stains[index] = viscy_stain
+
+##########################
+######## TODO ########
+##########################
+
+
+def visualise_both_methods():
+    # Your code here
+    pass
+
+
+# %% tags=["solution"]
+
+##########################
+######## Solution ########
+##########################
+
+def visualise_both_methods(
+    phase_images: np.array, target_stains: np.array, pix2pixHD_results: np.array, viscy_results: np.array,crop_size=None
+):
+    fig, axes = plt.subplots(5, 5, figsize=(15, 15))
+    sample_indices = np.random.choice(len(phase_images), 5)
+    if crop is not None:
+        phase_images = phase_images[:,:crop_size,:crop_size]
+        target_stains = target_stains[:,:crop_size,:crop_size]
+        pix2pixHD_results = pix2pixHD_results[:,:crop_size,:crop_size]
+        viscy_results = viscy_results[:,:crop_size,:crop_size]
+
+    for i, idx in enumerate(sample_indices):
+        axes[i, 0].imshow(phase_images[idx], cmap="gray")
+        axes[i, 0].set_title("Phase")
+        axes[i, 0].axis("off")
+        axes[i, 1].imshow(
+            target_stains[idx],
+            cmap="gray",
+            vmin=np.percentile(target_stains[idx], 1),
+            vmax=np.percentile(target_stains[idx], 99),
+        )
+        axes[i, 1].set_title("Nuclei")
+        axes[i, 1].axis("off")
+        axes[i, 2].imshow(
+            virtual_stains[idx],
+            cmap="gray",
+            vmin=np.percentile(target_stains[idx], 1),
+            vmax=np.percentile(target_stains[idx], 99),
+        )
+        axes[i, 2].set_title("Virtual Stain")
+        axes[i, 2].axis("off")
+    plt.tight_layout()
+    plt.show()
+
+# %% [markdown]
+"""
+# Part 5: BONUS: Sample different virtual staining solutions from the GAN using MC-Dropout and explore the uncertainty in the virtual stain predictions.
 --------------------------------------------------
 Steps:
 - Load the pre-trained model.
