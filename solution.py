@@ -476,7 +476,7 @@ def visualise_results(
 Compute the pixel-level metrics for the virtual stains and target stains. The metrics include Pearson correlation, SSIM, and PSNR.
 </div>
 """
-
+# %%
 test_metrics = pd.DataFrame(columns=["pearson_nuc", "SSIM_nuc", "psnr_nuc"])
 # Pixel-level metrics
 for i, (target_image, predicted_image) in enumerate(zip(target_stains, virtual_stains)):
@@ -511,9 +511,7 @@ test_metrics.boxplot(
 
 </div>
 """
-# %% markdown
 # Run cellpose to generate masks for the virtual stains
-# %%
 path_to_virtual_stain = Path(opt.results_dir)
 path_to_targets = Path(f"{output_image_folder}/test/")
 cellpose_model = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
@@ -566,6 +564,8 @@ plt.hist(results["F1"], bins=10)
 plt.xlabel("F1 Score")
 plt.ylabel("Frequency")
 plt.title(f"F1 Score: Mu {mean_f1}+-{std_f1}")
+
+# %% [markdown]
 """
 <div class="alert alert-success">
     
@@ -578,7 +578,7 @@ Please document hyperparameters, snapshots of predictions on validation set, and
 
 # %% [markdown]
 """
-# Part 4. Compare the performance of Viscy (regression-based) with Pix2PixHD GAN (generative modelling approach)
+# Part 4. Visualise Regression vs Generative Modelling Approaches
 --------------------------------------------------
 """
 # %% tags=["task"]
@@ -652,6 +652,7 @@ Steps:
 - Visualise the pixel-wise variance to explore the uncertainty in the virtual stain predictions.
 
 """
+# %%
 # Use the same model and dataloaders as before.
 # Load the test data.
 test_data_loader = CreateDataLoader(opt)
@@ -675,4 +676,4 @@ for i in range(0,5):
     axes[i].imshow(imread(sample_paths[idx]), cmap="gray")
     axes[i].set_title(f"Sample {i + 1}")
     axes[i].axis("off")
-# %% <a [markdown]> </a>
+# %% <a [markdown]> </a
