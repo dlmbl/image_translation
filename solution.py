@@ -659,12 +659,20 @@ test_dataset = test_data_loader.load_data()
 visualizer = Visualizer(opt)
 
 # Load pre-trained model
-opt.variational_inf_runs = 100 # Number of samples per phase input
+opt.variational_inf_runs = 10 # Number of samples per phase input
 opt.variation_inf_path = f"~/data/04_image_translation/pretrained_GAN/{opt.name}/results/samples/"  # Path to store the samples.
 opt.dropout_variation_inf = True  # Use dropout during inference.
 model = create_model(opt)
 # Generate & save predictions in the variation_inf_path directory.
 sampling(test_dataset, opt, model)
 
-
+# Load samples
+sample_paths = sorted([i for i in Path(opt.variation_inf_path).glob("**/*.tiff")])
+# Plot Multiple Samples
+fig, axes = plt.subplots(1, 5, figsize=(15, 15))
+sample_indices = np.random.choice(len(sample_paths), 5)
+for i in range(0,5):
+    axes[i].imshow(imread(sample_paths[idx]), cmap="gray")
+    axes[i].set_title(f"Sample {i + 1}")
+    axes[i].axis("off")
 # %% <a [markdown]> </a>
