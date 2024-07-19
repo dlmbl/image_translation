@@ -3,42 +3,46 @@
 # Generative Modelling Approaches to Image translation
 ---
 
-Written by Samuel Tonks, Krull Lab, University of Birmingham, UK.
+Written by Samuel Tonks, Krull Lab, University of Birmingham, UK.<br><br>
 
-In this part of the exercise, we will approach the same supervised image-to-image translation task as in the previous parts, but using a different model architecture. Here we will explore a generative modelling approach; a conditional Generative Adversarial Network (cGAN). 
-In contrast to formulating the task as a regression problem where the model produces a single deterministic output, cGANs learn to map from the source domain to a target domain distribution. This learnt distribution can then be sampled from to produce virtual staining predictions that are no longer a compromise between possible solutions which can lead to improved sharpness and realism in the generated images.
+In this part of the exercise, we will approach the same supervised image-to-image translation task as in the previous parts, but using a different model architecture. Here we will explore a generative modelling approach; a conditional Generative Adversarial Network (cGAN). <br><br>
+
+In contrast to formulating the task as a regression problem where the model produces a single deterministic output, cGANs learn to map from the source domain to a target domain distribution. This learnt distribution can then be sampled from to produce virtual staining predictions that are no longer a compromise between possible solutions which can lead to improved sharpness and realism in the generated images.<br><br>
 
 At a high-level a cGAN has two networks; a generator and a discriminator. The generator is a fully convolutional network that takes the source image as input and outputs the target image. The discriminator is also a fully convolutional network that takes as input the source image concatentated with a real or fake image and outputs the probabilities of whether the image is real or fake as shown in the Figure below: 
-[View PDF](https://github.com/Tonks684/image_translation/tree/main/imgs/GAN.pdf)
-The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)).
+[cGAN](https://github.com/Tonks684/image_translation/tree/main/imgs/GAN.svg)
+<br><br>
+The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)).<br><br>
 
-We will be exploring [Pix2PixHD GAN](https://arxiv.org/abs/1711.11585) architecture, a high-resolution extension of a traditional cGAN adapted for our recent [virtual staining works](https://ieeexplore.ieee.org/abstract/document/10230501?casa_token=NEyrUDqvFfIAAAAA:tklGisf9BEKWVjoZ6pgryKvLbF6JyurOu5Jrgoia1QQLpAMdCSlP9gMa02f3w37PvVjdiWCvFhA). 
- Pix2PixHD GAN improves upon the traditional cGAN by using a coarse-to-fine generator, a multi-scale discrimator and additional loss terms. The "coarse-to-fine" generator is composed of two sub-networks, both ResNet architectures that operate at different scales. The first sub-network (G1) generates a low-resolution image, which is then upsampled and concatenated with the source image to produce a higher resolution image. The multi-scale discriminator is composed of 3 networks that operate at different scales, each network is trained to distinguish between real and fake images at that scale. The generator is trained to fool the discriminator at each scale. The additional loss terms include a feature matching loss, which encourages the generator to produce images that are similar to the real images at each scale. 
-[View PDF](https://github.com/Tonks684/image_translation/tree/main/imgs/Pix2PixHD_1.pdf)
-[View PDF](https://github.com/Tonks684/image_translation/tree/main/imgs/Pix2PixHD_2.pdf)
+We will be exploring [Pix2PixHD GAN](https://arxiv.org/abs/1711.11585) architecture, a high-resolution extension of a traditional cGAN adapted for our recent [virtual staining works](https://ieeexplore.ieee.org/abstract/document/10230501?casa_token=NEyrUDqvFfIAAAAA:tklGisf9BEKWVjoZ6pgryKvLbF6JyurOu5Jrgoia1QQLpAMdCSlP9gMa02f3w37PvVjdiWCvFhA). Pix2PixHD GAN improves upon the traditional cGAN by using a coarse-to-fine generator, a multi-scale discrimator and additional loss terms. The "coarse-to-fine" generator is composed of two sub-networks, both ResNet architectures that operate at different scales. The first sub-network (G1) generates a low-resolution image, which is then upsampled and concatenated with the source image to produce a higher resolution image. The multi-scale discriminator is composed of 3 networks that operate at different scales, each network is trained to distinguish between real and fake images at that scale. The generator is trained to fool the discriminator at each scale. The additional loss terms include a feature matching loss, which encourages the generator to produce images that are similar to the real images at each scale. <br><br>
+[1](https://github.com/Tonks684/image_translation/tree/main/imgs/Pix2PixHD_1.svg)
+[1](https://github.com/Tonks684/image_translation/tree/main/imgs/Pix2PixHD_2.svg)
 """
 
 
 # %% [markdown]
 """
-Today, we will train a 2D image translation model using the Pix2PixHD GAN. We will use the same dataset of 301 fields of view (FOVs) of Human Embryonic Kidney (HEK) cells, each FOV has 3 channels (phase, membrane, and nuclei) as used in the previous section.
+Today, we will train a 2D image translation model using the Pix2PixHD GAN. We will use the same dataset of 301 fields of view (FOVs) of Human Embryonic Kidney (HEK) cells, each FOV has 3 channels (phase, membrane, and nuclei) as used in the previous section.<br><br>
 """
 # %% [markdown]
 """
 <div class="alert alert-warning">
-This part of the exercise is organized in 3 parts. As you have already explored the data in the previous parts, we will focus on training and evaluating Pix2PixHD GAN. The parts are as follows:
+This part of the exercise is organized in 3 parts.<br><br>
 
-* **Part 1** - Define dataloaders & walk through steps to train a Pix2PixHD GAN.
-* **Part 2** - Load and assess a pre-trained Pix2PixGAN using tensorboard, discuss the different loss components and how new hyper-parameter configurations could impact performance.
-* **Part 3** - Evaluate performance of pre-trained Pix2PixGAN using pixel-level and instance-level metrics.
-* **Part 4** - BONUS: Sample different virtual staining solutions from the GAN using MC-Dropout and explore the uncertainty in the virtual stain predictions.
+As you have already explored the data in the previous parts, we will focus on training and evaluating Pix2PixHD GAN. The parts are as follows:<br><br>
+
+* **Part 1** - Define dataloaders & walk through steps to train a Pix2PixHD GAN.<br><br>
+* **Part 2** - Load and assess a pre-trained Pix2PixGAN using tensorboard, discuss the different loss components and how new hyper-parameter configurations could impact performance.<br><br>
+* **Part 3** - Evaluate performance of pre-trained Pix2PixGAN using pixel-level and instance-level metrics.<br><br>
+* **Part 4** - Compare the performance of Viscy (regression-based) with Pix2PixHD GAN (generative modelling approach)<br><br>
+* **Part 5** - BONUS: Sample different virtual staining solutions from the GAN using MC-Dropout and explore the uncertainty in the virtual stain predictions.<br><br>
 </div>
 """
 # %% [markdown]
 """
-Our guesstimate is that each of the parts will take ~1 hour. A reasonable Pix2PixHD GAN can be trained in ~1.5 hours on a typical AWS node, this notebook is designed to walk you through the training steps but load a pre-trained model and tensorboard session to ensure we can complete the exercise in the time allocated. During Part 2, you're free to train your own model using the steps we outline in part 1.
+Our guesstimate is that each of the parts will take ~1 hour. A reasonable Pix2PixHD GAN can be trained in ~1.5 hours on a typical AWS node, this notebook is designed to walk you through the training steps but load a pre-trained model and tensorboard session to ensure we can complete the exercise in the time allocated. During Part 2, you're free to train your own model using the steps we outline in part 1.<br><br>
 
-The focus of this part of the exercise is on understanding a generative modelling approach to image translation, how to train and evaluate a cGAN, and explore some hyperparameters of the cGAN. 
+The focus of this part of the exercise is on understanding a generative modelling approach to image translation, how to train and evaluate a cGAN, and explore some hyperparameters of the cGAN. <br><br>
 """
 # %% [markdown]
 """
