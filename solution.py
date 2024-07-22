@@ -6,11 +6,11 @@ Written by Samuel Tonks, Krull Lab, University of Birmingham, UK.<br><br>
 ---
 
 ## Introduction to Generative Modelling
-In this part of the exercise, we will approach the same supervised image-to-image translation task as in the previous parts, but using a different model architecture. Here we will explore a generative modelling approach, specifically a conditional Generative Adversarial Network (cGAN). <br>
+In this part of the exercise, we will tackle the same supervised image-to-image translation task but use an alternative approach. Here we will explore a generative modelling approach, specifically a conditional Generative Adversarial Network (cGAN). <br>
 
-The previous regression-based approach learns a deterministic mapping from phase contrast to fluorescence. This results in a single virtual staining prediction to the image translation task which often leads to blurry results. Virtual staining is an ill-posed problem; given the phase contrast image, with inherent noise and lack of contrast between the background and the structure of interest, it can be very challenging to virtually stain from the phase contrast image alone. In fact, there is a distribution of possible virtual staining solutions that could come from the phase contrast.
+The previous regression-based method learns a deterministic mapping from phase contrast to fluorescence. This results in a single virtual staining prediction to the image translation task which often leads to blurry results. Virtual staining is an ill-posed problem; given the phase contrast image, with inherent noise and lack of contrast between the background and the structure of interest, it can be very challenging to virtually stain from the phase contrast image alone. In fact, there is a distribution of possible virtual staining solutions that could come from the phase contrast.
 
-cGANs learn to map from the phase contrast domain to a distirbution of virtual staining solutions. This distribution can then be sampled from to produce virtual staining predictions that are no longer a compromise between possible solutions which can lead to improved sharpness and realism in the generated images. Despite these improvements, cGANs can be prown to 'hallucinations' in which the network instead of making a compromise when it does not know something (such as a fine-grain detail of the nuclei shape) it makes something up that looks very sharp and realistic. These hallucinations can appear very plausible, but in many cases to predict such details from the phase contrast is extremely challenging. This is why determining reliable evaluation criteria is very important.<br>
+cGANs learn to map from the phase contrast domain to a distirbution of virtual staining solutions. This distribution can then be sampled from to produce virtual staining predictions that are no longer a compromise between possible solutions which can lead to improved sharpness and realism in the generated images. Despite these improvements, cGANs can be prown to 'hallucinations' in which the network instead of making a compromise when it does not know something (such as a fine-grain detail of the nuclei shape) it makes something up that looks very sharp and realistic. These hallucinations can appear very plausible, but in many cases to predict such details from the phase contrast is extremely challenging. This is why determining reliable evaluation criteria for the task at hand is very important when dealing with cGANs .<br>
 <br>
 <br>
 ![Overview of cGAN](https://github.com/Tonks684/dlmbl_material/blob/main/imgs/GAN.jpg?raw=true)
@@ -46,14 +46,12 @@ As you have already explored the data in the previous parts, we will focus on tr
 * **Part 2** - Load and assess a pre-trained Pix2PixGAN using tensorboard, discuss the different loss components and how new hyper-parameter configurations could impact performance.<br>
 * **Part 3** - Evaluate performance of pre-trained Pix2PixGAN using pixel-level and instance-level metrics.<br>
 * **Part 4** - Compare the performance of Viscy (regression-based) with Pix2PixHD GAN (generative modelling approach)<br>
-* **Part 5** - *BONUS*: Sample different virtual staining solutions from the GAN using MC-Dropout and explore the uncertainty in the virtual stain predictions.<br>
+* **Part 5** - *BONUS*: Sample different virtual staining solutions from the GAN using [MC-Dropout](https://arxiv.org/abs/1506.02142) and explore the variability and subsequent uncertainty in the virtual stain predictions.<br>
 </div>
 """
 # %% [markdown]
 """
 Our guesstimate is that each of the parts will take ~1 hour. A reasonable Pix2PixHD GAN can be trained in ~3.5 hours on a typical AWS node, this notebook is designed to walk you through the training steps but load a pre-trained model and tensorboard session to ensure we can complete the exercise in the time allocated. During Part 2 or 3, you're free to train your own model using the steps we outline in part 1.<br>
-
-The focus of this part of the image_translation session is on understanding a generative modelling approach to image translation, how to train and measure training performance for Pix2PixHD GAN, exploring pixel-level and instance-level metrics for evaluating the performance of the model. In the final section we will compare and discuss the Viscy vs Pix2PixHD GAN results. There is also a bonus part 4 where you can explore the variability in the samples from Pix2PixHD's generator. <br><br>
 """
 # %% [markdown]
 """
@@ -70,7 +68,7 @@ The focus of this part of the exercise is on understanding a generative modellin
 Learning goals:
 
 - Load dataset and configure dataloader.
-- Configure Pix2PixHD GAN and train to predict nuclei from phase.
+- Configure Pix2PixHD GAN to train for translating from phase to nuclei.
 """
 
 # %% Imports and paths
@@ -248,6 +246,16 @@ Finally, we also plot the Peak-Signal-to-Noise-Ratio (PSNR) and the Structural S
 
 </div>
 """
+# %% [markdown]
+"""
+<div class="alert alert-success">
+    
+## Checkpoint 1
+
+Congratulations! You should now have a better understanding of how a conditional generative model works!
+
+</div>
+"""
 # %% <a [markdown]></a>
 """
 
@@ -255,10 +263,11 @@ Finally, we also plot the Peak-Signal-to-Noise-Ratio (PSNR) and the Structural S
 # Part 2: Load & Assess trained Pix2PixGAN using tensorboard, discuss performance of the model.
 --------------------------------------------------
 Learning goals:
-- Understand the loss components of Pix2PixHD GAN and how they are used to train the model.
+- Load a pre-trained Pix2PixHD GAN model for either phase to nuclei or phase to cyto (lets start with phase to nuclei: dlmbl_vsnuclei)
+- Discuss the loss components of Pix2PixHD GAN and how they are used to train the model.
 - Evaluate the fit of the model on the train and validation datasets.
 
-In this part, we will evaluate the performance of the pre-trained model as shown in the previous part. We will begin by looking qualitatively at the model predictions, then dive into the different loss curves, as well as the SSIM and PSNR scores achieves on the validation set. We will also train another model to see if we can improve the performance of the model.
+In this part, we will evaluate the performance of the pre-trained model. We will begin by looking qualitatively at the model predictions, then dive into the different loss curves, as well as the SSIM and PSNR scores achieves on the validation set. We will explore the implications of different hyper-parameter combinations for the performance of the model.
 
 """
 # %%
@@ -299,9 +308,9 @@ Please note down your thoughts about the following questions...
 """
 <div class="alert alert-success">
     
-## Checkpoint 1
+## Checkpoint 2
 
-Congratulations! You should now have a better understanding of how a conditional generative model works! Please feel in your own time to train your own Pix2PixHD GAN model and evaluate the performance of the training of the model.
+Congratulations! You should now have a better understanding the different loss components of Pix2PixHD GAN and how they are used to train the model. You should also have a good understanding of the fit of the model during training on the training and validation datasets.
 
 </div>
 """
@@ -365,7 +374,7 @@ opt.no_ganFeat_loss = ""  # Turn off feature matching loss
 opt.no_lsgan = ""  # Turn off least square loss
 
 # Additional Inference parameters
-opt.name = f"dlmbl_vscyto"
+opt.name = f"dlmbl_vsnuclei"
 opt.how_many = 112  # Number of images to generate.
 opt.checkpoints_dir = f"./GAN_code/GANs_MI2I/pre_trained/"  # Path to the model checkpoints.
 opt.results_dir = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/"  # Path to store the results.
@@ -536,7 +545,7 @@ cellpose_model = "nuclei"  # or "cyto" depending on your choice of target for vi
 # Run for virtual stain
 !python -m cellpose --dir $path_to_virtual_stain --pretrained_model $cellpose_model --chan 0 --save_tiff
 # %%
-predicted_masks = sorted([i for i in path_to_predictions.glob("**/*_cp_masks.tif*")])
+predicted_masks = sorted([i for i in path_to_virtual_stain.glob("**/*_cp_masks.tif*")])
 target_masks = sorted([ifor i in Path('./data/nuclei/masks/).glob("**/*.tiff")])
 assert len(predicted_masks) == len(target_masks), "Number of masks do not match."
 
@@ -588,8 +597,8 @@ plt.title(f"F1 Score: Mu {mean_f1}+-{std_f1}")
     
 ## Checkpoint 3
 
-Congratulations! You have trained several image translation models now!
-Please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models and add the final perforance in [this google doc](https://docs.google.com/document/d/1hZWSVRvt9KJEdYu7ib-vFBqAVQRYL8cWaP_vFznu7D8/edit#heading=h.n5u485pmzv2z). We"ll discuss our combined results as a group.
+Congratulations! You have generated predictions from a pre-trained model and evaluated the performance of the model on unseen data. You have computed pixel-level metrics and instance-level metrics to evaluate the performance of the model. You may have also began training your own Pix2PixHD GAN models with alternative hyperparameters.
+Please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models and add the final perforance in [this google doc](ADD LINK TO SHARED DOC). We"ll discuss our combined results as a group.
 </div>
 """
 
@@ -697,9 +706,33 @@ sampling(test_dataset, opt, model)
 # %%
 # Visualise Samples                                      
 samples = sorted([i for i in Path(f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples").glob("**/*mask*.tif*")])
-
-        
-                              
+# Create arrays to store the images.
+sample_images = np.zeros((len(samples),112, 512, 512)) # (samples, images, height, width)
+# Load the images and store them in the arrays.
+for index, sample_path in tqdm(enumerate(samples)):
+    sample_image = imread(sample_path)
+    # Append the images to the arrays.
+    sample_images[index] = sample_image
+# Plot the phase image, the target image, the variance of samples and 3 samples
+fig, axes = plt.subplots(3, 7, figsize=(20, 5))
+sample_indices = np.random.choice(sample_images.shape[1], 3)
+for row, indices in enumerate(sample_indices):
+    axes[row, 0].imshow(phase_images[indices], cmap="gray")
+    axes[row, 0].set_title("Phase")
+    axes[row,0].axis("off")
+    axes[row, 1].imshow(target_stains[indices], cmap="gray")
+    axes[row, 1].set_title("Target Fluorescence")
+    axes[row,1].axis("off")
+    variance = np.var(sample_images[:,indices], axis=0)
+    axes[row, 2].imshow(variance, cmap="inferno")
+    axes[row, 2].set_title("Pixel-wise Sample Variance")
+    axes[row, 2].axis("off")
+    for col in range(3, 7):
+        axes[row, col].imshow(sample_images[col-3,indices], cmap="gray")
+        axes[row, col].set_title(f"Sample {col-3}")
+        axes[row,col].axis("off")
+plt.tight_layout()
+plt.show()                          
     
                                       
 
