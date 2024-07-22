@@ -73,27 +73,30 @@ from tqdm import tqdm
 from skimage import metrics
 from tifffile import imread, imsave
 import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore')
 
 # Import all the necessary hyperparameters and configurations for training.
-from GANs_MI2I.pix2pixHD.options.train_options import TrainOptions
-from GANs_MI2I.pix2pixHD.options.test_options import TestOptions
+from GAN_code.GANs_MI2I.pix2pixHD.options.train_options import TrainOptions
+from GAN_code.GANs_MI2I.pix2pixHD.options.test_options import TestOptions
 
 # Import Pytorch dataloader and transforms.
-from GANs_MI2I.pix2pixHD.data.data_loader_dlmbl import CreateDataLoader
+from GAN_code.GANs_MI2I.pix2pixHD.data.data_loader_dlmbl import CreateDataLoader
 
 # Import the model architecture.
-from GANs_MI2I.pix2pixHD.models import create_model
+from GAN_code.GANs_MI2I.pix2pixHD.models import create_model
 
 # Import helper functions for visualization and processing.
-from GANs_MI2I.pix2pixHD.util.visualizer import Visualizer
-from GANs_MI2I.pix2pixHD.util import util
+from GAN_code.GANs_MI2I.pix2pixHD.util.visualizer import Visualizer
+from GAN_code.GANs_MI2I.pix2pixHD.util import util
 
 # Import train script.
-from GANs_MI2I.pix2pixHD.train_dlmbl import train as train_model
-from GANs_MI2I.pix2pixHD.test_dlmbl import inference as inference_model, sampling
+from GAN_code.GANs_MI2I.pix2pixHD.train_dlmbl import train as train_model
+from GAN_code.GANs_MI2I.pix2pixHD.test_dlmbl import inference as inference_model
+from GAN_code.GANs_MI2I.pix2pixHD.test_dlmbl import sampling
 
 # Import the function to compute segmentation scores.
-from GANs_MI2I.segmentation_scores import gen_segmentation_scores
+from GAN_code.GANs_MI2I.segmentation_scores import gen_segmentation_scores
 # pytorch lightning wrapper for Tensorboard.
 from torch.utils.tensorboard import SummaryWriter
 
@@ -101,12 +104,13 @@ from torch.utils.tensorboard import SummaryWriter
 # Initialize the default options and parse the arguments.
 opt = TrainOptions().parse()
 # Set the seed for reproducibility.
-util.set_seed(int(opt.seed))
+util.set_seed(42)
 # Set the experiment folder name.
+translation_task = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
 opt.name = "dlmbl_vsnuclei"
 # Path to store all the logs.
-opt.checkpoints_dir = Path(f"~/data/04_image_translation/{opt.name}/logs/").expanduser()
-output_image_folder = Path("~/data/04_image_translation/tiff_files/").expanduser()
+opt.checkpoints_dir = Path(f"./training/").expanduser()
+output_image_folder = Path("./data/04_image_translation/tiff_files/").expanduser()
 # Initalize the tensorboard writer.
 writer = SummaryWriter(log_dir=opt.checkpoints_dir)
 
@@ -119,18 +123,13 @@ Having already downloaded and split our training, validation and test sets we no
 # Initialize the Dataset and Dataloaders.
 
 ## Define Dataset & Dataloader options.
-dataset_opt = {}
-dataset_opt["--dataroot"] = output_image_folder
-dataset_opt["--data_type"] = "16"  # Data type of the images.
-dataset_opt["--loadSize"] = "512"  # Size of the loaded phase image.
-dataset_opt["--input_nc"] = "1"  # Number of input channels.
-dataset_opt["--output_nc"] = "1"  # Number of output channels.
-dataset_opt["--resize_or_crop"] = "none"  # Scaling and cropping of images at load time [resize_and_crop|crop|scale_width|scale_width_and_crop|none].
-dataset_opt["--target"] = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
-
-
-# Update opt with key value pairs from dataset_opt.
-opt.__dict__.update(dataset_opt)
+opt.dataroot = output_image_folder
+opt.data_type = 16  # Data type of the images.
+opt.loadSize = 512  # Size of the loaded phase image.
+opt.input_nc = 1  # Number of input channels.
+opt.output_nc = 1  # Number of output channels.
+opt.resize_or_crop = "none"  # Scaling and cropping of images at load time [resize_and_crop|crop|scale_width|scale_width_and_crop|none].
+opt.target = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
 
 # Load Training Set for input into model
 train_dataloader = CreateDataLoader(opt)
@@ -142,6 +141,7 @@ opt.phase = "val"
 val_dataloader = CreateDataLoader(opt)
 dataset_val = val_dataloader.load_data()
 print(f"Total Validation Images = {len(val_dataloader)}")
+opt.phase= "train"
 
 # %% [markdown]
 """
@@ -150,36 +150,25 @@ Having loaded the data into the model we can now train the Pix2PixHD GAN to pred
 
 """
 # %%
-model_opt = {}
 
 # Define the parameters for the Generator.
-model_opt["--ngf"] = "64"  # Number of filters in the generator.
-model_opt["--n_downsample_global"] = "4"  # Number of downsampling layers in the generator.
-model_opt["--n_blocks_global"] = "9"  # Number of residual blocks in the generator.
-model_opt["--n_blocks_local"] = "3"  # Number of residual blocks in the generator.
-model_opt["--n_local_enhancers"] = "1"  # Number of local enhancers in the generator.
+opt.ngf = 64  # Number of filters in the generator.
+opt.n_downsample_global = 4  # Number of downsampling layers in the generator.
+opt.n_blocks_global = 9  # Number of residual blocks in the generator.
+opt.n_blocks_local = 3  # Number of residual blocks in the generator.
+opt.n_local_enhancers = 1  # Number of local enhancers in the generator.
 
 # Define the parameters for the Discriminators.
-model_opt["--num_D"] = "3"  # Number of discriminators.
-model_opt["--n_layers_D"] = "3"  # Number of layers in the discriminator.
-model_opt["--ndf"] = "32"  # Number of filters in the discriminator.
+opt.num_D = 3  # Number of discriminators.
+opt.n_layers_D = 3  # Number of layers in the discriminator.
+opt.ndf = 32  # Number of filters in the discriminator.
 
 # Define general training parameters.
-model_opt["--gpu_ids"] = "0"  # GPU ids to use.
-model_opt["--norm"] = "instance"  # Normalization layer in the generator.
-model_opt["--use_dropout"] = ""  # Use dropout in the generator (fixed at 0.2).
-model_opt["--batchSize"] = "8"  # Batch size.
+opt.gpu_ids = [0] # GPU ids to use.
+opt.norm = "instance"  # Normalization layer in the generator.
+opt.use_dropout = ""  # Use dropout in the generator (fixed at 0.2).
+opt.batchSize = 8  # Batch size.
 
-# Update opt with key value pairs from model_opt
-opt.__dict__.update(model_opt)
-
-# Initialize the model
-phase2nuclei_model = create_model(opt)
-# Define Optimizers for G and D
-optimizer_G, optimizer_D = (
-    phase2nuclei_model.module.optimizer_G,
-    phase2nuclei_model.module.optimizer_D,
-)
 # Create a visualizer to perform image processing and visualization
 visualizer = Visualizer(opt)
 
@@ -195,6 +184,19 @@ if opt.continue_train:
     print("Resuming from epoch %d at iteration %d" % (start_epoch, epoch_iter))
 else:
     start_epoch, epoch_iter = 1, 0
+    
+print('------------ Options -------------')
+for k, v in sorted(vars(opt).items()):
+    print('%s: %s' % (str(k), str(v)))
+print('-------------- End ----------------')
+
+# Initialize the model
+phase2nuclei_model = create_model(opt)
+# Define Optimizers for G and D
+optimizer_G, optimizer_D = (
+    phase2nuclei_model.module.optimizer_G,
+    phase2nuclei_model.module.optimizer_D,
+)
 
 train_model(
     opt,
@@ -206,7 +208,6 @@ train_model(
     optimizer_D,
     start_epoch,
     epoch_iter,
-    iter_path,
     writer,
 )
 
@@ -216,7 +217,8 @@ train_model(
 
 ## A heads up of what to expect from the training...
 <br>
-The train_model function has been designed so you can see the different Pix2PixHD GAN loss components discussed in the first part of the exercise as well as additional performance measurements. As previously mentioned, Pix2PixHD GAN has two networks; a generator and a discriminator. The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)). After a we have iterated through all the training data, we validate the performance of the network on the validation dataset. <br>
+The train_model function has been designed so you can see the different Pix2PixHD GAN loss components discussed in the first part of the exercise as well as additional performance measurements.<br> 
+As previously mentioned, Pix2PixHD GAN has two networks; a generator and a discriminator. The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)). After a we have iterated through all the training data, we validate the performance of the network on the validation dataset. <br>
 
 In light of this, we plot the discriminator probabilities of real (D_real) and fake (D_fake) images, for the training and validation datasets.<br>
 
@@ -238,6 +240,8 @@ Finally, we also plot the Peak-Signal-to-Noise-Ratio (PSNR) and the Structural S
 """
 # %% <a [markdown]></a>
 """
+
+
 # Part 2: Load & Assess trained Pix2PixGAN using tensorboard, discuss performance of the model.
 --------------------------------------------------
 Learning goals:
@@ -248,11 +252,9 @@ In this part, we will evaluate the performance of the pre-trained model as shown
 
 """
 # %%
-translation_task = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
-
-log_dir = f"~/data/04_image_translation/pretrained_GAN/{opt.name}/"
+log_dir = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/"
 %reload_ext tensorboard
-%tensorboard --logdir {$log_dir}
+%tensorboard --logdir $log_dir
 
 # %% [markdown]
 """
@@ -308,55 +310,50 @@ Instance-level metrics:
 - [F1 score](https://en.wikipedia.org/wiki/F1_score). via [Cellpose](https://cellpose.org/).
 """
 # %%
-
 opt = TestOptions().parse(save=False)
-dataset_opt = {}
-# Define the parameters for the dataset.
-dataset_opt["--dataroot"] = output_image_folder
-dataset_opt["--data_type"] = "16"  # Data type of the images.
-dataset_opt["--loadSize"] = "512"  # Size of the loaded phase image.
-dataset_opt["--input_nc"] = "1"  # Number of input channels.
-dataset_opt["--output_nc"] = "1"  # Number of output channels.
-dataset_opt["--resize_or_crop"] = "none"  # Scaling and cropping of images at load time [resize_and_crop|crop|scale_width|scale_width_and_crop|none].
-dataset_opt["--target"] = translation_task  # "nuclei" or "cyto" depending on your choice of target for virtual stain.
 
-# Update opt with key value pairs from dataset_opt.
-opt.__dict__.update(dataset_opt)
+# Define the parameters for the dataset.
+opt.dataroot = output_image_folder
+opt.data_type = 16  # Data type of the images.
+opt.loadSize = 512  # Size of the loaded phase image.
+opt.input_nc = 1  # Number of input channels.
+opt.output_nc = 1  # Number of output channels.
+opt.target = "cyto"  # "nuclei" or "cyto" depending on your choice of target for virtual stain.
+opt.resize_or_crop = "none"  # Scaling and cropping of images at load time [resize_and_crop|crop|scale_width|scale_width_and_crop|none].
+opt.batchSize = 1 # Batch size for training
 
 # Define the model parameters for the pre-trained model.
-model_opt = {}
-# Define the parameters for the Generator.
-model_opt["--ngf"] = "64"  # Number of filters in the generator.
-model_opt["--n_downsample_global"] = "4"  # Number of downsampling layers in the generator.
-model_opt["--n_blocks_global"] = "9"  # Number of residual blocks in the generator.
-model_opt["--n_blocks_local"] = "3"  # Number of residual blocks in the generator.
-model_opt["--n_local_enhancers"] = "1"  # Number of local enhancers in the generator.
-# Define the parameters for the Discriminators.
-model_opt["--num_D"] = "3"  # Number of discriminators.
-model_opt["--n_layers_D"] = "3"  # Number of layers in the discriminator.
-model_opt["--ndf"] = "32"  # Number of filters in the discriminator.
-# Define general training parameters.
-model_opt["--gpu_ids"] = "0"  # GPU ids to use.
-model_opt["--norm"] = "instance"  # Normalization layer in the generator.
-model_opt["--use_dropout"] = ""  # Use dropout in the generator (fixed at 0.2).
-model_opt["--batchSize"] = "8"  # Batch size.
-# Define loss functions.
-model_opt["--no_vgg_loss"] = ""  # Turn off VGG loss
-model_opt["--no_ganFeat_loss"] = ""  # Turn off feature matching loss
-model_opt["--no_lsgan"] = ""  # Turn off least square loss
-# Update opt with key value pairs from model_opt
-opt.__dict__.update(model_opt)
 
+# Define the parameters for the Generator.
+opt.ngf = 64  # Number of filters in the generator.
+opt.n_downsample_global = 4  # Number of downsampling layers in the generator.
+opt.n_blocks_global = 9  # Number of residual blocks in the generator.
+opt.n_blocks_local = 3  # Number of residual blocks in the generator.
+opt.n_local_enhancers = 1  # Number of local enhancers in the generator.
+
+# Define the parameters for the Discriminators.
+opt.num_D = 3  # Number of discriminators.
+opt.n_layers_D = 3  # Number of layers in the discriminator.
+opt.ndf = 32  # Number of filters in the discriminator.
+
+# Define general training parameters.
+opt.gpu_ids= [0]  # GPU ids to use.
+opt.norm = "instance"  # Normalization layer in the generator.
+opt.use_dropout = ""  # Use dropout in the generator (fixed at 0.2).
+opt.batchSize = 8  # Batch size.
+
+# Define loss functions.
+opt.no_vgg_loss = ""  # Turn off VGG loss
+opt.no_ganFeat_loss = ""  # Turn off feature matching loss
+opt.no_lsgan = ""  # Turn off least square loss
 
 # Additional Inference parameters
-inference_opt = {}
-opt.name = f"dlmbl_vs{translation_task}"
-inference_opt["--how_many"] = "144"  # Number of images to generate.
-inference_opt["--checkpoints_dir"] = f"~/data/04_image_translation/pretrained_GAN/{opt.name}/"  # Path to the model checkpoints.
-inference_opt["--results_dir"] = f"~/data/04_image_translation/pretrained_GAN/{opt.name}/results/"  # Path to store the results.
-inference_opt["--which_epoch"] = "latest"  # or specify the epoch number "40"
-inference_opt["--phase"] = "test"
-opt.__dict__.update(inference_opt)
+opt.name = f"dlmbl_vscyto"
+opt.how_many = 112  # Number of images to generate.
+opt.checkpoints_dir = f"./GAN_code/GANs_MI2I/pre_trained/"  # Path to the model checkpoints.
+opt.results_dir = f"./GAN_code/GANS_MI2I/pre_trained/{opt.name}inference_results/"  # Path to store the results.
+opt.which_epoch = "latest"  # or specify the epoch number "40"
+opt.phase = "test"
 
 opt.nThreads = 1  # test code only supports nThreads = 1
 opt.batchSize = 1  # test code only supports batchSize = 1
@@ -372,9 +369,11 @@ visualizer = Visualizer(opt)
 # Load pre-trained model
 model = create_model(opt)
 
+# %%
 # Generate & save predictions in the results directory.
 inference_model(test_dataset, opt, model)
 
+# %%
 # Gather results for evaluation
 virtual_stain_paths = sorted([i for i in Path(opt.results_dir).glob("**/*.tiff")])
 target_stain_paths = sorted([i for i in Path(f"{output_image_folder}/{translation_task}/test/").glob("**/*.tiff")])
@@ -397,7 +396,7 @@ for index, (v_path, t_path, p_path) in tqdm(
     phase_images[index] = phase_image
     target_stains[index] = target_stain
     virtual_stains[index] = virtual_stain
-
+    
 # %% [markdown] tags=[]
 """
 <div class="alert alert-info">
@@ -424,7 +423,6 @@ def visualise_results():
 ######## Solution ########
 ##########################
 
-
 def visualise_results(
     phase_images: np.array, target_stains: np.array, virtual_stains: np.array, crop_size=None
 ):
@@ -438,9 +436,9 @@ def visualise_results(
         crop_size (int, optional): Size of the crop. Defaults to None.
     """
 
-    fig, axes = plt.subplots(5, 3, figsize=(15, 15))
+    fig, axes = plt.subplots(5, 3, figsize=(15, 20))
     sample_indices = np.random.choice(len(phase_images), 5)
-    if crop is not None:
+    if crop_size is not None:
         phase_images = phase_images[:,:crop_size,:crop_size]
         target_stains = target_stains[:,:crop_size,:crop_size]
         virtual_stains = virtual_stains[:,:crop_size,:crop_size]
@@ -454,7 +452,7 @@ def visualise_results(
             vmin=np.percentile(target_stains[idx], 1),
             vmax=np.percentile(target_stains[idx], 99),
         )
-        axes[i, 1].set_title("Nuclei")
+        axes[i, 1].set_title("Target Fluorescence ")
         axes[i, 1].axis("off")
         axes[i, 2].imshow(
             virtual_stains[idx],
@@ -466,7 +464,7 @@ def visualise_results(
         axes[i, 2].axis("off")
     plt.tight_layout()
     plt.show()
-
+visualise_results(phase_images, target_stains,virtual_stains)
 # %% [markdown] tags=[]
 """
 <div class="alert alert-info">
@@ -499,6 +497,7 @@ test_metrics.boxplot(
     rot=30,
 )
 
+# %% [markdown]
 
 """
 <div class="alert alert-info">
@@ -511,16 +510,17 @@ test_metrics.boxplot(
 
 </div>
 """
+# %%
 # Run cellpose to generate masks for the virtual stains
 path_to_virtual_stain = Path(opt.results_dir)
 path_to_targets = Path(f"{output_image_folder}/test/")
 cellpose_model = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
+# %%
 # Run for virtual stain
 !python -m cellpose --dir $path_to_virtual_stain --pretrained_model $cellpose_model --chan 0 --save_tiff
-# Run for fluorescence stain
-!python -m cellpose --dir $path_to_virtual_stain --pretrained_model $cellpose_model --chan 0 --save_tiff
+# %%
 predicted_masks = sorted([i for i in path_to_predictions.glob("**/*_cp_masks.tif*")])
-target_masks = sorted([ifor i in Path(path_to_targets).glob("**/*_cp_masks.tif*")])
+target_masks = sorted([ifor i in Path('./data/nuclei/masks/).glob("**/*.tiff")])
 assert len(predicted_masks) == len(target_masks), "Number of masks do not match."
 
 # %% [markdown]
@@ -551,10 +551,10 @@ for i in range(len(predicted_masks)):
 # Compute the segmentation scores
 results, _, _ = \
     gen_segmentation_scores(
-        image_sets, results, final_score_output=f"~/data/04_image_translation/pretrained_GAN/{opt.name}/results/")
+        image_sets, results, final_score_output=f"./GAN_code/GANS_MI2I/pre_trained/{opt.name}/inference_results/")
 
 results.head()
-
+# %%
 # Get Mean F1 results
 mean_f1 = results["F1"].mean()
 std_f1 = results["F1"].std()
@@ -610,7 +610,7 @@ def visualise_both_methods():
 def visualise_both_methods(
     phase_images: np.array, target_stains: np.array, pix2pixHD_results: np.array, viscy_results: np.array,crop_size=None
 ):
-    fig, axes = plt.subplots(5, 5, figsize=(15, 15))
+    fig, axes = plt.subplots(5, 4, figsize=(15, 15))
     sample_indices = np.random.choice(len(phase_images), 5)
     if crop is not None:
         phase_images = phase_images[:,:crop_size,:crop_size]
@@ -630,14 +630,24 @@ def visualise_both_methods(
         )
         axes[i, 1].set_title("Nuclei")
         axes[i, 1].axis("off")
+        
         axes[i, 2].imshow(
-            virtual_stains[idx],
+            viscy_results[idx],
             cmap="gray",
             vmin=np.percentile(target_stains[idx], 1),
             vmax=np.percentile(target_stains[idx], 99),
         )
-        axes[i, 2].set_title("Virtual Stain")
+        axes[i, 2].set_title("Regression\nVirtual Stain")
         axes[i, 2].axis("off")
+        
+        axes[i, 3].imshow(
+            pix2pixHD_results[idx],
+            cmap="gray",
+            vmin=np.percentile(target_stains[idx], 1),
+            vmax=np.percentile(target_stains[idx], 99),
+        )
+        axes[i, 3].set_title("Pix2PixHD GAN\nVirtual Stain")
+        axes[i, 3].axis("off")
     plt.tight_layout()
     plt.show()
 
@@ -660,20 +670,19 @@ test_dataset = test_data_loader.load_data()
 visualizer = Visualizer(opt)
 
 # Load pre-trained model
-opt.variational_inf_runs = 10 # Number of samples per phase input
-opt.variation_inf_path = f"~/data/04_image_translation/pretrained_GAN/{opt.name}/results/samples/"  # Path to store the samples.
+opt.variational_inf_runs = 100 # Number of samples per phase input
+opt.variation_inf_path = f"./GAN_code/GANS_MI2I/pre_trained/{opt.name}/samples/"  # Path to store the samples.
 opt.dropout_variation_inf = True  # Use dropout during inference.
 model = create_model(opt)
 # Generate & save predictions in the variation_inf_path directory.
 sampling(test_dataset, opt, model)
+                                      
+# %%
+# Visualise Samples                                      
+samples = sorted([i for i in Path("./GAN_code/GANS_MI2I/pre_trained/{opt.name}/samples").glob("**/*mask*.tif*")])
 
-# Load samples
-sample_paths = sorted([i for i in Path(opt.variation_inf_path).glob("**/*.tiff")])
-# Plot Multiple Samples
-fig, axes = plt.subplots(1, 5, figsize=(15, 15))
-sample_indices = np.random.choice(len(sample_paths), 5)
-for i in range(0,5):
-    axes[i].imshow(imread(sample_paths[idx]), cmap="gray")
-    axes[i].set_title(f"Sample {i + 1}")
-    axes[i].axis("off")
-# %% <a [markdown]> </a
+        
+                              
+    
+                                      
+
