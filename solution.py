@@ -368,7 +368,7 @@ opt.no_lsgan = ""  # Turn off least square loss
 opt.name = f"dlmbl_vscyto"
 opt.how_many = 112  # Number of images to generate.
 opt.checkpoints_dir = f"./GAN_code/GANs_MI2I/pre_trained/"  # Path to the model checkpoints.
-opt.results_dir = f"./GAN_code/GANS_MI2I/pre_trained/{opt.name}inference_results/"  # Path to store the results.
+opt.results_dir = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/"  # Path to store the results.
 opt.which_epoch = "latest"  # or specify the epoch number "40"
 opt.phase = "test"
 
@@ -568,7 +568,7 @@ for i in range(len(predicted_masks)):
 # Compute the segmentation scores
 results, _, _ = \
     gen_segmentation_scores(
-        image_sets, results, final_score_output=f"./GAN_code/GANS_MI2I/pre_trained/{opt.name}/inference_results/")
+        image_sets, results, final_score_output=f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/")
 
 results.head()
 # %%
@@ -688,7 +688,7 @@ visualizer = Visualizer(opt)
 
 # Load pre-trained model
 opt.variational_inf_runs = 100 # Number of samples per phase input
-opt.variation_inf_path = f"./GAN_code/GANS_MI2I/pre_trained/{opt.name}/samples/"  # Path to store the samples.
+opt.variation_inf_path = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples/"  # Path to store the samples.
 opt.dropout_variation_inf = True  # Use dropout during inference.
 model = create_model(opt)
 # Generate & save predictions in the variation_inf_path directory.
@@ -696,7 +696,7 @@ sampling(test_dataset, opt, model)
                                       
 # %%
 # Visualise Samples                                      
-samples = sorted([i for i in Path("./GAN_code/GANS_MI2I/pre_trained/{opt.name}/samples").glob("**/*mask*.tif*")])
+samples = sorted([i for i in Path(f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples").glob("**/*mask*.tif*")])
 
         
                               
