@@ -3,7 +3,7 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
-# Save current directory
+# Save current directory.
 START_DIR=$(pwd)
 echo "Starting directory: $START_DIR"
 
