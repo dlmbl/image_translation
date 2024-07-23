@@ -15,6 +15,11 @@ Run the setup script to create the environment for this exercise and download th
 ```bash
 sh setup.sh
 ```
+If you get errors relating to '\r' run
+```bash
+dos2unix setup.sh
+```
+
 Activate your environment
 ```bash
 conda activate 04_image_translation
