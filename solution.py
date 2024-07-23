@@ -60,6 +60,7 @@ Set your python kernel to <span style="color:black;">04_image_translation_phd</s
 </div>
 """
 # %% <a [markdown]></a>
+
 """
 # Part 1: Define dataloaders & walk through steps to train a Pix2PixHD GAN.
 ---------
@@ -70,8 +71,7 @@ Learning goals:
 - Load dataset and configure dataloader.
 - Configure Pix2PixHD GAN to train for translating from phase to nuclei.
 """
-
-# %% Imports and paths
+# %%
 from pathlib import Path
 import os
 import sys
@@ -125,7 +125,6 @@ Path(f'{opt.checkpoints_dir}/{opt.name}').mkdir(parents=True, exist_ok=True)
 output_image_folder = Path("./data/04_image_translation/tiff_files/").expanduser()
 # Initalize the tensorboard writer.
 writer = SummaryWriter(log_dir=opt.checkpoints_dir)
-
 # %% [markdown]
 """
 ## 1.1 Load Dataset & Configure Dataloaders.<br>
@@ -154,7 +153,6 @@ val_dataloader = CreateDataLoader(opt)
 dataset_val = val_dataloader.load_data()
 print(f"Total Validation Images = {len(val_dataloader)}")
 opt.phase= "train"
-
 # %% [markdown]
 """
 ## Configure Pix2PixHD GAN and train to predict nuclei from phase.
@@ -162,7 +160,6 @@ Having loaded the data into the model we can now train the Pix2PixHD GAN to pred
 
 """
 # %%
-
 # Define the parameters for the Generator.
 opt.ngf = 64  # Number of filters in the generator.
 opt.n_downsample_global = 4  # Number of downsampling layers in the generator.
@@ -222,7 +219,6 @@ train_model(
     epoch_iter,
     writer,
 )
-
 # %% [markdown]
 """
 <div class="alert alert-info">
@@ -262,8 +258,6 @@ Congratulations! You should now have a better understanding of how a conditional
 """
 # %% <a [markdown]></a>
 """
-
-
 # Part 2: Load & Assess trained Pix2PixGAN using tensorboard, discuss performance of the model.
 --------------------------------------------------
 Learning goals:
@@ -277,25 +271,24 @@ In this part, we will evaluate the performance of the pre-trained model. We will
 # %%
 log_dir = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/"
 %reload_ext tensorboard
+# %%
 %tensorboard --logdir $log_dir
-
 # %% [markdown]
 """
 <div class="alert alert-info">
-
 ## Qualitative evaluation:
 <br>
 We have visualised the model output for an unseen phase contrast image and the target, nuclei stain.<br><br>
-
 Please note down your thoughts about the following questions...
 <br><br>
 
 1.**What do you notice about the virtual staining predictions? How do they appear compared to the regression-based approach? Can you spot any hallucinations?** 
 <br>
 </div>
-
+"""
+# %% [markdown]
+"""
 <div class="alert alert-info">
-
 ## Quantitative evaluation:
 
 2.**What do you notice about the probabilities of the discriminators? How do the values compare during training compared to validation?
@@ -306,8 +299,8 @@ Please note down your thoughts about the following questions...
 5. What do you notice about the least-square loss?<br><br>
 6. What do you notice about the PSNR and SSIM scores? Are we over or underfitting at all?**<br><br>
 </div>
-
 """
+
 # %% [markdown]
 """
 <div class="alert alert-success">
@@ -318,9 +311,9 @@ Congratulations! You should now have a better understanding the different loss c
 
 </div>
 """
+
 # %% [markdown]
 """
-
 # Part 3: Evaluate performance of the virtual staining on unseen data.
 --------------------------------------------------
 ## Evaluate the performance of the model.
@@ -339,6 +332,7 @@ Pixel-level metrics:
 Instance-level metrics:
 - [F1 score](https://en.wikipedia.org/wiki/F1_score). via [Cellpose](https://cellpose.org/).
 """
+
 # %%
 opt = TestOptions().parse(save=False)
 
@@ -409,7 +403,7 @@ virtual_stain_paths = sorted([i for i in Path(opt.results_dir).glob("**/*.tiff")
 target_stain_paths = sorted([i for i in Path(f"{output_image_folder}/{translation_task}/test/").glob("**/*.tiff")])
 phase_paths = sorted([i for i in Path(f"{output_image_folder}/input/test/").glob("**/*.tiff")])
 assert (len(virtual_stain_paths) == len(target_stain_paths) == len(phase_paths)
-), "Number of images do not match."
+), f"Number of images do not match. {len(virtual_stain_paths)},{len(target_stain_paths)} {len(phase_paths)} "
 
 # Create arrays to store the images.
 virtual_stains = np.zeros((len(virtual_stain_paths), 512, 512))
@@ -487,8 +481,8 @@ def visualise_results(
         axes[i, 2].imshow(
             virtual_stains[idx],
             cmap="gray",
-            vmin=np.percentile(target_stains[idx], 1),
-            vmax=np.percentile(target_stains[idx], 99),
+            # vmin=np.percentile(target_stains[idx], 1),
+            # vmax=np.percentile(target_stains[idx], 99),
         )
         axes[i, 2].set_title("Virtual Stain")
         axes[i, 2].axis("off")
@@ -523,7 +517,7 @@ for i, (target_image, predicted_image) in enumerate(zip(target_stains, virtual_s
     }
 
 test_metrics.boxplot(
-    column=["pearson_nuc", "SSIM_nuc", "psnr_nuc"],
+    column=["pearson_nuc", "SSIM_nuc"], #,, "psnr_nuc"],
     rot=30,
 )
 
@@ -547,12 +541,80 @@ path_to_targets = Path(f"{output_image_folder}/test/")
 cellpose_model = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
 # %%
 # Run for virtual stain
-!python -m cellpose --dir $path_to_virtual_stain --pretrained_model $cellpose_model --chan 0 --save_tiff
+import subprocess
+command = [ "python", "-m", "cellpose", "--dir", "./GAN_code/GANs_MI2I/pre_trained/dlmbl_vsnuclei/inference_results", "--pretrained_model", "nuclei","--chan", "0", "--save_tif", "--verbose"]
+result = subprocess.run(command,capture_output=True, text=True)
+print(result.stdout)
+print(result.stderr)
 # %%
 predicted_masks = sorted([i for i in path_to_virtual_stain.glob("**/*_cp_masks.tif*")])
-target_masks = sorted([ifor i in Path('./data/nuclei/masks/).glob("**/*.tiff")])
-assert len(predicted_masks) == len(target_masks), "Number of masks do not match."
+target_masks = sorted([i for i in Path('./data/04_image_translation/tiff_files/nuclei/masks/').glob("**/*.tiff")])
+print(predicted_masks[:3], target_masks[:3])
+assert len(predicted_masks) == len(target_masks), f"Number of masks do not match {len(predicted_masks)}, {len(target_masks)}"
+# %%
 
+
+def visualise_results_and_masks(
+    phase_images: np.array, target_stains: np.array, virtual_stains: np.array, target_masks_paths: list, virtual_masks_paths: list, crop_size=None
+):
+    """
+    Visualizes the results of the image processing algorithm.
+
+    Args:
+        phase_images (np.array): Array of phase images.
+        target_stains (np.array): Array of target stain images.
+        virtual_stains (np.array): Array of virtual stain images.
+        target_masks_paths (list): list of target stain mask paths.
+        virtual_masks_paths (list): list of virtual stain mask paths.
+        crop_size (int, optional): Size of the crop. Defaults to None.
+    """
+
+    fig, axes = plt.subplots(3, 5, figsize=(15, 20))
+    sample_indices = np.random.choice(len(phase_images),3)
+    if crop_size is not None:
+        phase_images = phase_images[:,:crop_size,:crop_size]
+        target_stains = target_stains[:,:crop_size,:crop_size]
+        virtual_stains = virtual_stains[:,:crop_size,:crop_size]
+        
+    for i, idx in enumerate(sample_indices):
+        axes[i, 0].imshow(phase_images[idx], cmap="gray")
+        axes[i, 0].set_title("Phase")
+        axes[i, 0].axis("off")
+        axes[i, 1].imshow(
+            target_stains[idx],
+            cmap="gray",
+            vmin=np.percentile(target_stains[idx], 1),
+            vmax=np.percentile(target_stains[idx], 99),
+        )
+        axes[i, 1].set_title("Target Fluorescence ")
+        axes[i, 1].axis("off")
+        target_mask = imread(target_masks_paths[idx]).astype(np.uint8)
+        axes[i, 2].imshow(
+            target_mask,
+            cmap="inferno",)
+        axes[i, 2].set_title("Target Fluorescence Mask")
+        axes[i, 2].axis("off")
+        axes[i, 3].imshow(
+            virtual_stains[idx],
+            cmap="gray",
+            # vmin=np.percentile(target_stains[idx], 1),
+            # vmax=np.percentile(target_stains[idx], 99),
+        )
+        axes[i, 3].set_title("Virtual Stain")
+        axes[i, 3].axis("off")
+        virtual_mask = imread(virtual_masks_paths[idx]).astype(np.uint8)       
+        axes[i, 4].imshow(
+            virtual_mask,
+            cmap="inferno",
+            # vmin=np.percentile(target_stains[idx], 1),
+            # vmax=np.percentile(target_stains[idx], 99),
+        )
+        axes[i, 4].set_title("Virtual Stain Mask")
+        axes[i, 4].axis("off")
+    plt.tight_layout()
+    plt.show()
+    
+visualise_results_and_masks(phase_images, target_stains,virtual_stains,target_masks,predicted_masks)
 # %% [markdown]
 # Use a predefined function to compute F1 score and its component parts.
 
