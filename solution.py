@@ -714,6 +714,25 @@ for index, sample_path in tqdm(enumerate(samples)):
     # Append the images to the arrays.
     sample_images[index] = sample_image
 # Plot the phase image, the target image, the variance of samples and 3 samples
+
+# Create a matplotlib plot with animation through images.
+import matplotlib.animation as animation
+
+def animate_images(images):
+    fig, ax = plt.subplots()
+    ax.axis('off')
+    im = ax.imshow(images[0], cmap='gray')
+
+    def update(i):
+        im.set_array(images[i])
+        return im,
+
+    ani = animation.FuncAnimation(fig, update, frames=len(images), interval=200)
+    plt.show()
+
+animate_images(sample_images)
+
+# Visualise the results of the model on the test set.
 fig, axes = plt.subplots(3, 7, figsize=(20, 5))
 sample_indices = np.random.choice(sample_images.shape[1], 3)
 for row, indices in enumerate(sample_indices):
