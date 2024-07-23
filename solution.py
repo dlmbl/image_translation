@@ -74,6 +74,9 @@ Learning goals:
 # %% Imports and paths
 from pathlib import Path
 import os
+import sys
+parent_dir = os.path.abspath(os.path.join(os.getcwd(), '..'))
+sys.path.append(parent_dir)
 import torch
 import numpy as np
 import pandas as pd
