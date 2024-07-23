@@ -6,7 +6,7 @@ Make sure that you are inside of the `image_translation` folder by using the `cd
 Make sure that you can use conda to switch environments.
 
 ```bash
-module load miniconda/23.10.0-1
+conda init
 ```
 
 **Close your shell, and login again.** 
