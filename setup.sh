@@ -19,7 +19,7 @@ echo "Repository cloned. Current directory: $(pwd)"
 # Create conda environment from yml
 cd ./GANs_MI2I
 echo "Current directory after navigating to GANs_MI2I: $(pwd)"
-#conda env create -f ./04_image_translation_phd.yml
+conda env create -f ./04_image_translation_phd.yml
 echo "Conda environment created."
 
 # Activate the environment
