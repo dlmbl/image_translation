@@ -120,7 +120,8 @@ util.set_seed(42)
 translation_task = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
 opt.name = "dlmbl_vsnuclei"
 # Path to store all the logs.
-opt.checkpoints_dir = Path(f"./training/").expanduser()
+opt.checkpoints_dir = Path(f"./GAN_code/GANs_MI2I/new_training_runs/").expanduser()
+Path(f'{opt.checkpoints_dir}/{opt.name}').mkdir(parents=True, exist_ok=True)
 output_image_folder = Path("./data/04_image_translation/tiff_files/").expanduser()
 # Initalize the tensorboard writer.
 writer = SummaryWriter(log_dir=opt.checkpoints_dir)
@@ -347,7 +348,7 @@ opt.data_type = 16  # Data type of the images.
 opt.loadSize = 512  # Size of the loaded phase image.
 opt.input_nc = 1  # Number of input channels.
 opt.output_nc = 1  # Number of output channels.
-opt.target = "cyto"  # "nuclei" or "cyto" depending on your choice of target for virtual stain.
+opt.target = "nuclei"  # "nuclei" or "cyto" depending on your choice of target for virtual stain.
 opt.resize_or_crop = "none"  # Scaling and cropping of images at load time [resize_and_crop|crop|scale_width|scale_width_and_crop|none].
 opt.batchSize = 1 # Batch size for training
 
@@ -379,7 +380,7 @@ opt.no_lsgan = ""  # Turn off least square loss
 # Additional Inference parameters
 opt.name = f"dlmbl_vsnuclei"
 opt.how_many = 112  # Number of images to generate.
-opt.checkpoints_dir = f"./GAN_code/GANs_MI2I/pre_trained/"  # Path to the model checkpoints.
+opt.checkpoints_dir = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/"  # Path to the model checkpoints.
 opt.results_dir = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/"  # Path to store the results.
 opt.which_epoch = "latest"  # or specify the epoch number "40"
 opt.phase = "test"
