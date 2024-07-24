@@ -29,6 +29,8 @@ We will be exploring [Pix2PixHD GAN](https://arxiv.org/abs/1711.11585) architect
 <br>
 The additional loss terms include a feature matching loss (as shown below), which encourages the generator to produce images that are perceptually similar to the real images at each scale. As shown below for each of the 3 discriminators, the network takes seperaetly both phase concatenated with virtual stain and phase concatenated with fluorescence stain as input and as they pass through the network the feature maps obtained for each ith layer are extracted. We then minimize the loss which is the mean L1 distance between the feature maps obtained across each of the 3 discriminators and each ith layer. <br>
 ![Feature Matching Loss Pix2PixHD GAN](https://github.com/Tonks684/dlmbl_material/blob/main/imgs/Pix2pixHD_2.jpg?raw=true)
+
+All of the discriminator and generator loss terms are weighted the same.
 """
 
 # %% [markdown]
@@ -46,7 +48,7 @@ As you have already explored the data in the previous parts, we will focus on tr
 * **Part 2** - Load and assess a pre-trained Pix2PixGAN using tensorboard, discuss the different loss components and how new hyper-parameter configurations could impact performance.<br>
 * **Part 3** - Evaluate performance of pre-trained Pix2PixGAN using pixel-level and instance-level metrics.<br>
 * **Part 4** - Compare the performance of Viscy (regression-based) with Pix2PixHD GAN (generative modelling approach)<br>
-* **Part 5** - *BONUS*: Sample different virtual staining solutions from the GAN using [MC-Dropout](https://arxiv.org/abs/1506.02142) and explore the variability and subsequent uncertainty in the virtual stain predictions.<br>
+* **Part 5** - *BONUS*: Sample different virtual staining solutions from the Pix2PixHD GAN using [MC-Dropout](https://arxiv.org/abs/1506.02142) and explore the variability and subsequent uncertainty in the virtual stain predictions.<br>
 </div>
 """
 # %% [markdown]
@@ -199,6 +201,8 @@ for k, v in sorted(vars(opt).items()):
     print('%s: %s' % (str(k), str(v)))
 print('-------------- End ----------------')
 
+# Set the number of epoch to be 1 for demonstration purposes
+opt.n_epochs = 1
 # Initialize the model
 phase2nuclei_model = create_model(opt)
 # Define Optimizers for G and D
@@ -206,7 +210,7 @@ optimizer_G, optimizer_D = (
     phase2nuclei_model.module.optimizer_G,
     phase2nuclei_model.module.optimizer_D,
 )
-
+# %%
 train_model(
     opt,
     phase2nuclei_model,
@@ -225,24 +229,47 @@ train_model(
 
 ## A heads up of what to expect from the training...
 <br>
-The train_model function has been designed so you can see the different Pix2PixHD GAN loss components discussed in the introductory section of the exercise as well as additional performance measurements.<br> 
-As previously mentioned, Pix2PixHD GAN has two networks; a generator and a discriminator. The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)). After a we have iterated through all the training data, we validate the performance of the network on the validation dataset. <br>
+</div>
+"""
+# %% [markdown]
+"""
+<div class="alert alert-info">
 
-In light of this, we plot the discriminator predicted probabilities of a real fluorescnece image being real and virtual image being a fake image, for the training and validation datasets.<br>
+**Visualise Phase, Fluorescence and Virtual Stain for Validation Examples**<br>
+- We can observe how the performance improves over time using the images tab and the sliding window.
+<br><br>
+</div>
+"""
+# %% [markdown]
+"""
+<div class="alert alert-info">
 
-Both networks are also trained using the generator feature matching loss which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.<br>
+**Discriminator Predicted Probabilities**<br>
+- We plot the discriminator's predicted probabilities that the phase with fluorescence is phase and fluorescence and that the phase with virtual stain is phase with virtual stain. It is typically trained until the discriminator can no longer classify whether or not the generated images are real or fake better than a random guess (p(0.5)). We plot this for both the training and validation datasets.<br><br>
+</div>
+"""
+# %% [markdown]
+"""
+<div class="alert alert-info">
 
-In our implementation, in addition to the Pix2PixHD GAN loss components already described we stabalize the GAN training by adding an additional least-square loss term. This term stabalizes the training of the GAN by penalizing the generator for producing images that the discriminator is very confident (high probability) are fake. This loss term is added to the generator loss and is used to train the generator to produce images that are similar to the real images.
-We plot the least-square loss (Generator_Loss_GAN) for the training and validation sets together to observe the performance and how the model is fitting the data.<br>
+**Adversarial Loss**<br>
+- We can formulate the adversarial loss as a Least Squared Error Loss in which for real data the discriminator should output a value close to 1 and for fake data a value close to 0. The generator's goal is to make the discriminator output a value as close to 1 for fake data. We plot the least squared error loss.
+<br><br>
+</div>
+"""
+# %% [markdown]
+"""
+<div class="alert alert-info">
+
+**Feature Matching Loss**<br>
+- Both networks are also trained using the generator feature matching loss which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.<br><br>
+</div>
+"""
+# %% [markdown]
+"""
+<div class="alert alert-info">
 
 This implementation allows for the turning on/off of the least-square loss term by setting the opt.no_lsgan flag to the model options. As well as the turning off of the feature matching loss term by setting the opt.no_ganFeat_loss flag to the model options. Something you might want to explore in the next section!<br><br>
-
-Finally, we also plot the Peak-Signal-to-Noise-Ratio (PSNR) and the Structural Similarity Index Measure (SSIM) for the training and validation sets together to observe the performance and how the model is fitting the data.<br>
-
-[PSNR](https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio), is a widely used metric to assess the quality of the generated image compared to the target image. Formally. it measures the ratio between the maximum possible power of a signal and the power of the corrupting noise that affects the fidelity of its representation. Essentially, PSNR provides a quantitative measurement of the quality of an image after compression or other processing such as image translation. Unlike the Pearson-Coeffecient, when measuring how much the pixel values of the virtual stain deviate from the target nuceli stain the score is sensitive to changes in brightness and contrast which is required for necessary for evaluating virtual staining. PSNR values range from 0dB to upper bounds that rarely exceed 60 dB. Extremely high PSNR values (above 50 dB) typically indicate almost negligible differences between the images.<br>
-
-
-[SSIM](https://en.wikipedia.org/wiki/Structural_similarity), is a perceptual metric used to measure the similarity between two images. Unlike PSNR, which focuses on pixel-wise differences, SSIM evaluates image quality based on perceived changes in structural information, luminance, and contrast. SSIM values range from -1 to 1, where 1 indicates perfect similarity between the images. SSIM is a more robust metric than PSNR, as it takes into account the human visual system"s sensitivity to structural information and contrast. SSIM is particularly useful for evaluating the quality of image translation models, as it provides a more accurate measure of the perceptual similarity between the generated and target images.<br>
 
 </div>
 """
@@ -276,6 +303,8 @@ log_dir = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/"
 # %% [markdown]
 """
 <div class="alert alert-info">
+
+
 ## Qualitative evaluation:
 <br>
 We have visualised the model output for an unseen phase contrast image and the target, nuclei stain.<br><br>
@@ -289,15 +318,15 @@ Please note down your thoughts about the following questions...
 # %% [markdown]
 """
 <div class="alert alert-info">
+
+
+
 ## Quantitative evaluation:
 
-2.**What do you notice about the probabilities of the discriminators? How do the values compare during training compared to validation?
-<br>
-<br> 
-3. What do you notice about the probabilities of the discriminators? How do the values compare during training compared to validation?<br><br>
-4. What do you notice about the feature matching L1 loss?<br><br>
-5. What do you notice about the least-square loss?<br><br>
-6. What do you notice about the PSNR and SSIM scores? Are we over or underfitting at all?**<br><br>
+2. What do you notice about the probabilities of the discriminators? How do the values compare during training compared to validation?<br><br>
+3. What do you notice about the feature matching L1 loss?<br><br>
+4. What do you notice about the least-square loss?<br><br>
+5. What do you notice about the PSNR and SSIM scores? Are we over or underfitting at all?**<br><br>
 </div>
 """
 
