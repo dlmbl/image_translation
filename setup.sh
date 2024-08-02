@@ -23,6 +23,7 @@ echo "Current directory after navigating to GANs_MI2I: $(pwd)"
 # # Find path to the environment - conda activate doesn't work from within shell scripts.
 ENV_PATH=$(conda info --envs | grep 06_image_translation | awk '{print $NF}')
 $ENV_PATH/bin/pip install "dominate"
+$ENV_PATH/bin/pip install "tensorboardX" #TODO: do we really need to have this? Can we use Tensorboard from PyTorch?
 
 # Define and create the output directory
 output_dir="~/data/06_image_translation/tiff_files"
