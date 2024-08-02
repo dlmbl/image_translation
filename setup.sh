@@ -18,18 +18,10 @@ echo "Repository cloned. Current directory: $(pwd)"
 # Create conda environment from yml
 cd ~/data/06_image_translation/GAN_code/GANs_MI2I
 echo "Current directory after navigating to GANs_MI2I: $(pwd)"
-# TODO check if re really need to have a separate conda environment
-# conda env create -f ./06_image_translation_phd.yml
-# echo "Conda environment created."
 
-# Activate the environment
-source $(conda info --base)/etc/profile.d/conda.sh
-conda activate 06_image_translation
-echo "Conda environment activated."
-
-# Install additional packages
-conda install -y ipykernel nbformat nbconvert black jupytext ipywidgets
-echo "Additional packages installed."
+# # Find path to the environment - conda activate doesn't work from within shell scripts.
+ENV_PATH=$(conda info --envs | grep 06_image_translation | awk '{print $NF}')
+$ENV_PATH/bin/pip install "dominate"
 
 # Define and create the output directory
 output_dir="~/data/06_image_translation/tiff_files"
@@ -43,6 +35,7 @@ wget -O dlmbl_requisites.zip "https://zenodo.org/record/13173900/files/dlmbl_req
 unzip dlmbl_requisites.zip
 
 # Download and split the dataset
+cd ~/data/06_image_translation/GAN_code/GANs_MI2I
 python download_and_split_dataset.py --output_image_folder "$output_dir" --crop_size 512
 echo "Dataset downloaded and split."
 # Return to the starting directory
