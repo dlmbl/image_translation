@@ -1,34 +1,7 @@
-# Exercise 4: Image translation
-## Setup
+# Exercise 6: Image translation
 
-Make sure that you are inside of the `image_translation` folder by using the `cd` command to change directories if needed.
+This exercise is split into two parts: 
+- Virtual staining with a regression approach using a UNet  (`part_1`)
+- Virtual staining with an generative approach using a GAN (`part_2`)
 
-Make sure that you can use mamba to switch environments.
-
-```bash
-mamba init
-```
-
-**Close your shell, and login again.** 
-
-Run the setup script to create the environment for this exercise and download the dataset.
-```bash
-sh setup.sh
-```
-Activate your environment
-```bash
-mamba activate 04_image_translation
-```
-
-Launch a jupyter environment
-
-```
-jupyter notebook
-```
-
-...and continue with the instructions in the notebook.
-
-If 04_image_translation is not available as a kernel in jupyter, run
-```
-python -m ipykernel install --user --name=04_image_translation
-```
+Look into the directory for the part you will be working on (i.e `part_1` or `part_2`) for further installation and 'how to run' instructions.
