@@ -41,6 +41,7 @@ cd ~/data/06_image_translation/GAN_code/GANs_MI2I
 python download_and_split_dataset.py --output_image_folder "$output_dir" --crop_size 512
 echo "Dataset downloaded and split."
 
+
 # Return to the starting directory
 cd "$START_DIR"
 echo "Returned to the starting directory: $START_DIR"
