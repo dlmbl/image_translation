@@ -58,7 +58,7 @@ Our guesstimate is that each of the parts will take ~1 hour. A reasonable Pix2Pi
 # %% [markdown]
 """
 <div class="alert alert-danger">
-Set your python kernel to <span style="color:black;">04_image_translation_phd</span>
+Set your python kernel to <span style="color:black;">06_image_translation</span>
 </div>
 """
 # %% <a [markdown]></a>
@@ -89,6 +89,11 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
 
+#TODO: remove after testing
+dlmbl_folder = os.path.abspath('/home/eduardo.hirata/data/06_image_translation')
+if dlmbl_folder not in sys.path:
+    sys.path.append(dlmbl_folder)
+
 # Import all the necessary hyperparameters and configurations for training.
 from GAN_code.GANs_MI2I.pix2pixHD.options.train_options import TrainOptions
 from GAN_code.GANs_MI2I.pix2pixHD.options.test_options import TestOptions
@@ -113,7 +118,6 @@ from GAN_code.GANs_MI2I.segmentation_scores import gen_segmentation_scores
 # pytorch lightning wrapper for Tensorboard.
 from torch.utils.tensorboard import SummaryWriter
 
-
 # Initialize the default options and parse the arguments.
 opt = TrainOptions().parse()
 # Set the seed for reproducibility.
@@ -122,9 +126,10 @@ util.set_seed(42)
 translation_task = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
 opt.name = "dlmbl_vsnuclei"
 # Path to store all the logs.
-opt.checkpoints_dir = Path(f"./GAN_code/GANs_MI2I/new_training_runs/").expanduser()
+top_dir = Path(f"~/data/06_image_translation").expanduser() # TODO: Change this to point to your data directory.
+opt.checkpoints_dir = top_dir/"GAN_code/GANs_MI2I/new_training_runs/"
 Path(f'{opt.checkpoints_dir}/{opt.name}').mkdir(parents=True, exist_ok=True)
-output_image_folder = Path("./data/04_image_translation/tiff_files/").expanduser()
+output_image_folder = top_dir/"tiff_files/"
 # Initalize the tensorboard writer.
 writer = SummaryWriter(log_dir=opt.checkpoints_dir)
 # %% [markdown]
@@ -145,6 +150,7 @@ opt.resize_or_crop = "none"  # Scaling and cropping of images at load time [resi
 opt.target = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
 
 # Load Training Set for input into model
+opt.isTrain = True 
 train_dataloader = CreateDataLoader(opt)
 dataset_train = train_dataloader.load_data()
 print(f"Total Training Images = {len(train_dataloader)}")
@@ -296,7 +302,7 @@ In this part, we will evaluate the performance of the pre-trained model. We will
 
 """
 # %%
-log_dir = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/"
+log_dir = top_dir/f"/GAN_code/GANs_MI2I/pre_trained/{opt.name}/"
 %reload_ext tensorboard
 # %%
 %tensorboard --logdir $log_dir
@@ -571,13 +577,13 @@ cellpose_model = "nuclei"  # or "cyto" depending on your choice of target for vi
 # %%
 # Run for virtual stain
 import subprocess
-command = [ "python", "-m", "cellpose", "--dir", "./GAN_code/GANs_MI2I/pre_trained/dlmbl_vsnuclei/inference_results", "--pretrained_model", "nuclei","--chan", "0", "--save_tif", "--verbose"]
+command = [ "python", "-m", "cellpose", "--dir", top_dir"/GAN_code/GANs_MI2I/pre_trained/dlmbl_vsnuclei/inference_results", "--pretrained_model", "nuclei","--chan", "0", "--save_tif", "--verbose"]
 result = subprocess.run(command,capture_output=True, text=True)
 print(result.stdout)
 print(result.stderr)
 # %%
 predicted_masks = sorted([i for i in path_to_virtual_stain.glob("**/*_cp_masks.tif*")])
-target_masks = sorted([i for i in Path('./data/04_image_translation/tiff_files/nuclei/masks/').glob("**/*.tiff")])
+target_masks = sorted([i for i in top_dir/Path('/data/06_image_translation/tiff_files/nuclei/masks/').glob("**/*.tiff")])
 print(predicted_masks[:3], target_masks[:3])
 assert len(predicted_masks) == len(target_masks), f"Number of masks do not match {len(predicted_masks)}, {len(target_masks)}"
 # %%
