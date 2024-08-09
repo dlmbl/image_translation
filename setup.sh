@@ -3,8 +3,6 @@
 ### TO DO ###
 # Change back the environment name and run pip install dominate
 
-
-
 # Exit immediately if a command exits with a non-zero status
 set -e
 # Save current directory.
@@ -44,6 +42,6 @@ mkdir -p "$output_dir"
 echo "Output directory created at: $output_dir"
 python download_and_split_dataset.py --output_image_folder "$output_dir" --crop_size 512
 echo "Dataset downloaded and split."
-i# Return to the starting directory
+# Return to the starting directory
 cd "$START_DIR"
 echo "Returned to the starting directory: $START_DIR"
