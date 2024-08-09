@@ -3,7 +3,6 @@
 ### TO DO ###
 # Change back the environment name and run pip install dominate
 
-
 # Exit immediately if a command exits with a non-zero status
 set -e
 # Save current directory.
