@@ -1,39 +1,7 @@
-# Exercise 4: Image translation via Generative Modelling
-## Setup
+# Exercise 6: Image translation
 
-Make sure that you are inside of the `image_translation` folder by using the `cd` command to change directories if needed.
+This exercise is split into two parts: 
+- Virtual staining with a regression approach using a UNet  [part_1](./part_1/)
+- Virtual staining with an generative approach using a GAN [part_2](./part_2/)
 
-Make sure that you can use conda to switch environments.
-
-```bash
-conda init
-```
-
-**Close your shell, and login again.** 
-
-Run the setup script to create the environment for this exercise and download the dataset.
-```bash
-sh setup.sh
-```
-If you get errors relating to '\r' run
-```bash
-dos2unix setup.sh
-```
-
-Activate your environment
-```bash
-conda activate 04_image_translation
-```
-
-Launch a jupyter environment
-
-```
-jupyter notebook
-```
-
-...and continue with the instructions in the notebook.
-
-If 04_image_translation is not available as a kernel in jupyter, run
-```
-python -m ipykernel install --user --name=04_image_translation
-```
+Look into the directory for the part you will be working on (i.e `part_1` or `part_2`) for further installation and 'how to run' instructions.
