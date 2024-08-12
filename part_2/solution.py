@@ -79,7 +79,7 @@ import os
 import sys
 
 # ------- PLEASE ENSURE THIS MATCHES WHERE YOU HAVE DOWNLOADED THE DLMLBL REPO -----
-parent_dir = '../../data/06_image_translation/part2'
+parent_dir = '/home/eduardo.hirata/data/06_image_translation/part_2'
 sys.path.append(parent_dir)
 
 import torch
