@@ -78,9 +78,6 @@ from pathlib import Path
 import os
 import sys
 
-# ------- PLEASE ENSURE THIS MATCHES WHERE YOU HAVE DOWNLOADED THE DLMLBL REPO -----
-parent_dir = '/home/eduardo.hirata/data/06_image_translation/part_2'
-sys.path.append(parent_dir)
 
 import torch
 import numpy as np
@@ -92,8 +89,10 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
 
-#TODO: remove after testing
-dlmbl_folder = os.path.abspath('/home/eduardo.hirata/data/06_image_translation')
+
+# ------- PLEASE ENSURE THIS MATCHES WHERE YOU HAVE DOWNLOADED THE DLMLBL REPO -----
+# HINT : /data/06_image_translation/part2
+dlmbl_folder = os.path.abspath('.....')
 if dlmbl_folder not in sys.path:
     sys.path.append(dlmbl_folder)
 
@@ -129,7 +128,8 @@ util.set_seed(42)
 translation_task = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
 opt.name = "dlmbl_vsnuclei"
 # Path to store all the logs.
-top_dir = Path(f"~/data/06_image_translation").expanduser() # TODO: Change this to point to your data directory.
+top_dir = Path(f"~/data/06_image_translation/part2").expanduser() # TODO: Change this to point to your data directory.
+assert top_dir.exists(), "Please set the top_dir to point to the correct directory."
 opt.checkpoints_dir = top_dir/"GAN_code/GANs_MI2I/new_training_runs/"
 Path(f'{opt.checkpoints_dir}/{opt.name}').mkdir(parents=True, exist_ok=True)
 output_image_folder = top_dir/"tiff_files/"
@@ -412,8 +412,8 @@ opt.no_lsgan = ""  # Turn off least square loss
 # Additional Inference parameters
 opt.name = f"dlmbl_vsnuclei"
 opt.how_many = 112  # Number of images to generate.
-opt.checkpoints_dir = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/"  # Path to the model checkpoints.
-opt.results_dir = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/"  # Path to store the results.
+opt.checkpoints_dir = top_dir/f"GAN_code/GANs_MI2I/pre_trained/{opt.name}/"  # Path to the model checkpoints.
+opt.results_dir = top_dir/f"GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/"  # Path to store the results.
 opt.which_epoch = "latest"  # or specify the epoch number "40"
 opt.phase = "test"
 
@@ -586,7 +586,7 @@ print(result.stdout)
 print(result.stderr)
 # %%
 predicted_masks = sorted([i for i in path_to_virtual_stain.glob("**/*_cp_masks.tif*")])
-target_masks = sorted([i for i in top_dir/Path('/data/06_image_translation/tiff_files/nuclei/masks/').glob("**/*.tiff")])
+target_masks = sorted([i for i in top_dir/Path('tiff_files/nuclei/masks/').glob("**/*.tiff")])
 print(predicted_masks[:3], target_masks[:3])
 assert len(predicted_masks) == len(target_masks), f"Number of masks do not match {len(predicted_masks)}, {len(target_masks)}"
 # %%
@@ -681,7 +681,7 @@ for i in range(len(predicted_masks)):
 # Compute the segmentation scores
 results, _, _ = \
     gen_segmentation_scores(
-        image_sets, results, final_score_output=f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/")
+        image_sets, results, final_score_output=top_dir/f"GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/")
 
 results.head()
 # %%
@@ -801,7 +801,7 @@ visualizer = Visualizer(opt)
 
 # Load pre-trained model
 opt.variational_inf_runs = 100 # Number of samples per phase input
-opt.variation_inf_path = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples/"  # Path to store the samples.
+opt.variation_inf_path = top_dir= f"GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples/"  # Path to store the samples.
 opt.dropout_variation_inf = True  # Use dropout during inference.
 model = create_model(opt)
 # Generate & save predictions in the variation_inf_path directory.
@@ -809,7 +809,7 @@ sampling(test_dataset, opt, model)
                                       
 # %%
 # Visualise Samples                                      
-samples = sorted([i for i in Path(f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples").glob("**/*mask*.tif*")])
+samples = sorted([i for i in top_dir/Path(f"GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples").glob("**/*mask*.tif*")])
 # Create arrays to store the images.
 sample_images = np.zeros((len(samples),112, 512, 512)) # (samples, images, height, width)
 # Load the images and store them in the arrays.
