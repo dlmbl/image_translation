@@ -1,45 +1,27 @@
 # %% [markdown]
 """
 # A Generative Modelling Approach to Image translation
-Written by Samuel Tonks, Krull Lab, University of Birmingham, UK.<br><br>
-
----
-
-## Introduction to Generative Modelling
-In this part of the exercise, we will tackle the same supervised image-to-image translation task but use an alternative approach. Here we will explore a generative modelling approach, specifically a conditional Generative Adversarial Network (cGAN). <br>
-
-The previous regression-based method learns a deterministic mapping from phase contrast to fluorescence. This results in a single virtual staining prediction to the image translation task which often leads to blurry results. Virtual staining is an ill-posed problem; given the phase contrast image, with inherent noise and lack of contrast between the background and the structure of interest, it can be very challenging to virtually stain from the phase contrast image alone. In fact, there is a distribution of possible virtual staining solutions that could come from the phase contrast.
-
-cGANs learn to map from the phase contrast domain to a distirbution of virtual staining solutions. This distribution can then be sampled from to produce virtual staining predictions that are no longer a compromise between possible solutions which can lead to improved sharpness and realism in the generated images. Despite these improvements, cGANs can be prown to 'hallucinations' in which the network instead of making a compromise when it does not know something (such as a fine-grain detail of the nuclei shape) it makes something up that looks very sharp and realistic. These hallucinations can appear very plausible, but in many cases to predict such details from the phase contrast is extremely challenging. This is why determining reliable evaluation criteria for the task at hand is very important when dealing with cGANs .<br>
-<br>
-<br>
-![Overview of cGAN](https://github.com/Tonks684/dlmbl_material/blob/main/imgs/GAN.jpg?raw=true)
-<br>
-<br>
-
-At a high-level a cGAN has two networks; a generator and a discriminator. The generator is a fully convolutional network that takes the source image as input and outputs the target image. The discriminator is also a fully convolutional network that takes as input the source image concatentated with a real or fake image and outputs the probabilities of whether the real fluorescence image is real or whether the fake virtual stain image is fake as shown in the figure above.<br>
-
-The generator is trained to fool the discriminator into predicting a high probability that its generated outputs are real, and the discriminator is trained to distinguish between real and fake images. Both networks are trained using an adversarial loss in a min-max game, where the generator tries to minimize the probability of the discriminator correctly classifying its outputs as fake, and the discriminator tries to maximize this probability. It is typically trained until the discriminator can no longer determine whether or not the generated images are real or fake better than a random guess (p(0.5)).<br>
-
-We will be exploring [Pix2PixHD GAN](https://arxiv.org/abs/1711.11585) architecture, a high-resolution extension of a traditional cGAN adapted for our recent [virtual staining works](https://ieeexplore.ieee.org/abstract/document/10230501?casa_token=NEyrUDqvFfIAAAAA:tklGisf9BEKWVjoZ6pgryKvLbF6JyurOu5Jrgoia1QQLpAMdCSlP9gMa02f3w37PvVjdiWCvFhA). Pix2PixHD GAN improves upon the traditional cGAN by using a coarse-to-fine generator, a multi-scale discrimator and additional loss terms. The "coarse-to-fine" generator is composed of two sub-networks, both ResNet architectures that operate at different scales. As shown below the first sub-network (G1) generates a low-resolution image, which is then upsampled and concatenated with the source image to produce a higher resolution image. The multi-scale discriminator is composed of 3 networks that operate at different scales, each network is trained to distinguish between real and fake images at that scale using the same convolution kernel size. This leads to the convolution having a much wider field of view when the inputs are downsampled. The generator is trained to fool the discriminator at each scale. 
-<br>
-<br>
-![Pix2PixGAN ](https://github.com/Tonks684/dlmbl_material/blob/main/imgs/Pix2pixHD_1.jpg?raw=true)
-<br>
-<br>
-The additional loss terms include a feature matching loss (as shown below), which encourages the generator to produce images that are perceptually similar to the real images at each scale. As shown below for each of the 3 discriminators, the network takes seperaetly both phase concatenated with virtual stain and phase concatenated with fluorescence stain as input and as they pass through the network the feature maps obtained for each ith layer are extracted. We then minimize the loss which is the mean L1 distance between the feature maps obtained across each of the 3 discriminators and each ith layer. <br>
-![Feature Matching Loss Pix2PixHD GAN](https://github.com/Tonks684/dlmbl_material/blob/main/imgs/Pix2pixHD_2.jpg?raw=true)
-
-All of the discriminator and generator loss terms are weighted the same.
+Written by [Samuel Tonks](https://github.com/Tonks684), Krull Lab University of Birmingham UK, with many inputs and bugfixes from [Eduardo Hirata-Miyasaki](https://github.com/edyoshikun), [Ziwen Liu](https://github.com/ziw-liu) and [Shalin Mehta](https://github.com/mattersoflight) of CZ Biohub San Francisco.
 """
 
 # %% [markdown]
 """
-Today, we will train a 2D image translation model using the Pix2PixHD GAN. We will use the same dataset of 301 fields of view (FOVs) of Human Embryonic Kidney (HEK) cells, each FOV has 3 channels (phase, membrane, and nuclei) as used in the previous section.This implementation is designed to model a single translation task at once. <br>
+## Overview
+
+In part 2 of the image_translation exercise, we will predict fluorescence images of nuclei markers only from quantitative phase images of cells, using a specific type of generative model called a Conditional Generative Adversarial Network (cGAN). In contrast to a regression-based approach, cGANs learn to map from the phase contrast domain to a distirbution of virtual staining solutions. In this work we will utilise the [Pix2PixHD GAN](https://arxiv.org/abs/1711.11585) used in our recent [virtual staining works](https://ieeexplore.ieee.org/abstract/document/10230501?casa_token=NEyrUDqvFfIAAAAA:tklGisf9BEKWVjoZ6pgryKvLbF6JyurOu5Jrgoia1QQLpAMdCSlP9gMa02f3w37PvVjdiWCvFhA). For more details on the architecture and loss components of cGANs and Pix2PixHD GAN please see the READ.me. 
+
+During this exercise will assess the different loss components of a pre-trained Pix2PixHD for the virtual nuclei staining task. We will then evaluate the performance of the model on unseen data using the same pixel-level and instance-level metrics as in the previous section. We will compare the performance of the Pix2PixHD GAN with the regression-based model Viscy. Finally, as a bonus, we will explore the variability and uncertainty in the virtual stain predictions using [MC-Dropout](https://arxiv.org/abs/1506.02142).
+
+## References
+- [Wang, T. et al. (2018) High-resolution image synthesis and semantic manipulation with conditional GANs](https://arxiv.org/abs/1711.11585)
+- [Tonks, S. et al. (2023) Evaluating virtual staining for high-throughput screening](https://ieeexplore.ieee.org/abstract/document/10230501?casa_token=NEyrUDqvFfIAAAAA:tklGisf9BEKWVjoZ6pgryKvLbF6JyurOu5Jrgoia1QQLpAMdCSlP9gMa02f3w37PvVjdiWCvFhA)
+- [Gal, Y. et al. (2016) Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning](https://arxiv.org/abs/1506.02142)
+
 """
 # %% [markdown]
 """
-<div class="alert alert-warning">
+## Goals
+
 This part of the exercise is organized in 5 parts.<br>
 
 As you have already explored the data in the previous parts, we will focus on training and evaluating Pix2PixHD GAN. The parts are as follows:<br>
@@ -49,12 +31,10 @@ As you have already explored the data in the previous parts, we will focus on tr
 * **Part 3** - Evaluate performance of pre-trained Pix2PixGAN using pixel-level and instance-level metrics.<br>
 * **Part 4** - Compare the performance of Viscy (regression-based) with Pix2PixHD GAN (generative modelling approach)<br>
 * **Part 5** - *BONUS*: Sample different virtual staining solutions from the Pix2PixHD GAN using [MC-Dropout](https://arxiv.org/abs/1506.02142) and explore the variability and subsequent uncertainty in the virtual stain predictions.<br>
-</div>
+
 """
-# %% [markdown]
-"""
-Our guesstimate is that each of the parts will take ~1 hour. A reasonable Pix2PixHD GAN can be trained in ~3.5 hours on a typical AWS node, this notebook is designed to walk you through the training steps but load a pre-trained model and tensorboard session to ensure we can complete the exercise in the time allocated. During Part 2 or 3, you're free to train your own model using the steps we outline in part 1.<br>
-"""
+
+
 # %% [markdown]
 """
 <div class="alert alert-danger">
@@ -74,11 +54,14 @@ Learning goals:
 - Configure Pix2PixHD GAN to train for translating from phase to nuclei.
 """
 # %%
-from pathlib import Path
+# TO DO: Change the path to the directory where the data and code is stored is stored.
 import os
 import sys
+parent_dir = os.path.abspath("~/data/06_image_translation/part2/GAN_code/GANs_MI2I/")
+sys.path.append(parent_dir)
 
-
+# %%
+from pathlib import Path
 import torch
 import numpy as np
 import pandas as pd
@@ -86,39 +69,37 @@ from tqdm import tqdm
 from skimage import metrics
 from tifffile import imread, imsave
 import matplotlib.pyplot as plt
+from cellpose import models
+from typing import List, Tuple
+from numpy.typing import ArrayLike
 import warnings
 warnings.filterwarnings('ignore')
 
-
-# ------- PLEASE ENSURE THIS MATCHES WHERE YOU HAVE DOWNLOADED THE DLMLBL REPO -----
-# HINT : /data/06_image_translation/part2
-dlmbl_folder = os.path.abspath('.....')
-if dlmbl_folder not in sys.path:
-    sys.path.append(dlmbl_folder)
-
 # Import all the necessary hyperparameters and configurations for training.
-from GAN_code.GANs_MI2I.pix2pixHD.options.train_options import TrainOptions
-from GAN_code.GANs_MI2I.pix2pixHD.options.test_options import TestOptions
+from pix2pixHD.options.train_options import TrainOptions
+from pix2pixHD.options.test_options import TestOptions
 
 # Import Pytorch dataloader and transforms.
-from GAN_code.GANs_MI2I.pix2pixHD.data.data_loader_dlmbl import CreateDataLoader
+from pix2pixHD.data.data_loader_dlmbl import CreateDataLoader
 
 # Import the model architecture.
-from GAN_code.GANs_MI2I.pix2pixHD.models import create_model
+from pix2pixHD.models import create_model
 
 # Import helper functions for visualization and processing.
-from GAN_code.GANs_MI2I.pix2pixHD.util.visualizer import Visualizer
-from GAN_code.GANs_MI2I.pix2pixHD.util import util
+from pix2pixHD.util.visualizer import Visualizer
+from pix2pixHD.util import util
 
 # Import train script.
-from GAN_code.GANs_MI2I.pix2pixHD.train_dlmbl import train as train_model
-from GAN_code.GANs_MI2I.pix2pixHD.test_dlmbl import inference as inference_model
-from GAN_code.GANs_MI2I.pix2pixHD.test_dlmbl import sampling
+from pix2pixHD.train_dlmbl import train as train_model
+from pix2pixHD.test_dlmbl import inference as inference_model
+from pix2pixHD.test_dlmbl import sampling
 
-# Import the function to compute segmentation scores.
-from GAN_code.GANs_MI2I.segmentation_scores import gen_segmentation_scores
 # pytorch lightning wrapper for Tensorboard.
 from torch.utils.tensorboard import SummaryWriter
+
+# Import the same evaluation metrics as in the previous section.
+from viscy.evaluation.evaluation_metrics import mean_average_precision
+from torchmetrics.functional import accuracy, dice, jaccard_index
 
 # Initialize the default options and parse the arguments.
 opt = TrainOptions().parse()
@@ -128,8 +109,7 @@ util.set_seed(42)
 translation_task = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
 opt.name = "dlmbl_vsnuclei"
 # Path to store all the logs.
-top_dir = Path(f"~/data/06_image_translation/part2").expanduser() # TODO: Change this to point to your data directory.
-assert top_dir.exists(), "Please set the top_dir to point to the correct directory."
+top_dir = Path(f"~/data/06_image_translation/part2/").expanduser() # TODO: Change this to point to your data directory.
 opt.checkpoints_dir = top_dir/"GAN_code/GANs_MI2I/new_training_runs/"
 Path(f'{opt.checkpoints_dir}/{opt.name}').mkdir(parents=True, exist_ok=True)
 output_image_folder = top_dir/"tiff_files/"
@@ -164,6 +144,8 @@ val_dataloader = CreateDataLoader(opt)
 dataset_val = val_dataloader.load_data()
 print(f"Total Validation Images = {len(val_dataloader)}")
 opt.phase= "train"
+
+# Plot a sample image from the training set.
 # %% [markdown]
 """
 ## Configure Pix2PixHD GAN and train to predict nuclei from phase.
@@ -192,7 +174,6 @@ opt.batchSize = 8  # Batch size.
 # Create a visualizer to perform image processing and visualization
 visualizer = Visualizer(opt)
 
-
 # Here will first start training a model from scrach however we can continue to train from a previously trained model by setting the following parameters.
 opt.continue_train = False
 if opt.continue_train:
@@ -211,7 +192,7 @@ for k, v in sorted(vars(opt).items()):
 print('-------------- End ----------------')
 
 # Set the number of epoch to be 1 for demonstration purposes
-opt.n_epochs = 2 # start from 1
+opt.n_epochs = 2
 # Initialize the model
 phase2nuclei_model = create_model(opt)
 # Define Optimizers for G and D
@@ -237,49 +218,16 @@ train_model(
 <div class="alert alert-info">
 
 ## A heads up of what to expect from the training...
-<br>
-</div>
-"""
-# %% [markdown]
-"""
-<div class="alert alert-info">
-
-**Visualise Phase, Fluorescence and Virtual Stain for Validation Examples**<br>
-- We can observe how the performance improves over time using the images tab and the sliding window.
 <br><br>
-</div>
-"""
-# %% [markdown]
-"""
-<div class="alert alert-info">
-
-**Discriminator Predicted Probabilities**<br>
-- We plot the discriminator's predicted probabilities that the phase with fluorescence is phase and fluorescence and that the phase with virtual stain is phase with virtual stain. It is typically trained until the discriminator can no longer classify whether or not the generated images are real or fake better than a random guess (p(0.5)). We plot this for both the training and validation datasets.<br><br>
-</div>
-"""
-# %% [markdown]
-"""
-<div class="alert alert-info">
-
-**Adversarial Loss**<br>
-- We can formulate the adversarial loss as a Least Squared Error Loss in which for real data the discriminator should output a value close to 1 and for fake data a value close to 0. The generator's goal is to make the discriminator output a value as close to 1 for fake data. We plot the least squared error loss.
+**- Visualise results**: We can observe how the performance improves over time using the images tab and the sliding window.
 <br><br>
-</div>
-"""
-# %% [markdown]
-"""
-<div class="alert alert-info">
-
-**Feature Matching Loss**<br>
-- Both networks are also trained using the generator feature matching loss which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.<br><br>
-</div>
-"""
-# %% [markdown]
-"""
-<div class="alert alert-info">
-
+**- Discriminator Predicted Probabilities**: We plot the discriminator's predicted probabilities that the phase with fluorescence is phase and fluorescence and that the phase with virtual stain is phase with virtual stain. It is typically trained until the discriminator can no longer classify whether or not the generated images are real or fake better than a random guess (p(0.5)). We plot this for both the training and validation datasets.
+<br><br>
+**- Adversarial Loss**: We can formulate the adversarial loss as a Least Squared Error Loss in which for real data the discriminator should output a value close to 1 and for fake data a value close to 0. The generator's goal is to make the discriminator output a value as close to 1 for fake data. We plot the least squared error loss.
+<br><br>
+**- Feature Matching Loss**: Both networks are also trained using the generator feature matching loss which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.
+<br><br>
 This implementation allows for the turning on/off of the least-square loss term by setting the opt.no_lsgan flag to the model options. As well as the turning off of the feature matching loss term by setting the opt.no_ganFeat_loss flag to the model options. Something you might want to explore in the next section!<br><br>
-
 </div>
 """
 # %% [markdown]
@@ -288,7 +236,7 @@ This implementation allows for the turning on/off of the least-square loss term 
     
 ## Checkpoint 1
 
-Congratulations! You should now have a better understanding of how a conditional generative model works!
+Congratulations! You should now have a better understanding of how to train a Pix2PixHD GAN model for translating from phase to nuclei. You should also have a good understanding of the different loss components of Pix2PixHD GAN and how they are used to train the model.
 
 </div>
 """
@@ -297,15 +245,15 @@ Congratulations! You should now have a better understanding of how a conditional
 # Part 2: Load & Assess trained Pix2PixGAN using tensorboard, discuss performance of the model.
 --------------------------------------------------
 Learning goals:
-- Load a pre-trained Pix2PixHD GAN model for either phase to nuclei or phase to cyto (lets start with phase to nuclei: dlmbl_vsnuclei)
+- Load a pre-trained Pix2PixHD GAN model for either phase to nuclei.
 - Discuss the loss components of Pix2PixHD GAN and how they are used to train the model.
 - Evaluate the fit of the model on the train and validation datasets.
 
-In this part, we will evaluate the performance of the pre-trained model. We will begin by looking qualitatively at the model predictions, then dive into the different loss curves, as well as the SSIM and PSNR scores achieves on the validation set. We will explore the implications of different hyper-parameter combinations for the performance of the model.
+In this part, we will evaluate the performance of the pre-trained model. We will begin by looking qualitatively at the model predictions, then dive into the different loss plots. We will discuss the implications of different hyper-parameter combinations for the performance of the model.
 
 """
 # %%
-log_dir = top_dir/f"/GAN_code/GANs_MI2I/pre_trained/{opt.name}/"
+log_dir = f"{top_dir}/model_tensorboard/{opt.name}/"
 %reload_ext tensorboard
 # %%
 %tensorboard --logdir $log_dir
@@ -313,29 +261,13 @@ log_dir = top_dir/f"/GAN_code/GANs_MI2I/pre_trained/{opt.name}/"
 """
 <div class="alert alert-info">
 
-
-## Qualitative evaluation:
-<br>
-We have visualised the model output for an unseen phase contrast image and the target, nuclei stain.<br><br>
+## Training Results
 Please note down your thoughts about the following questions...
 <br><br>
-
-1.**What do you notice about the virtual staining predictions? How do they appear compared to the regression-based approach? Can you spot any hallucinations?** 
-<br>
-</div>
-"""
-# %% [markdown]
-"""
-<div class="alert alert-info">
-
-
-
-## Quantitative evaluation:
-
-2. What do you notice about the probabilities of the discriminators? How do the values compare during training compared to validation?<br><br>
-3. What do you notice about the feature matching L1 loss?<br><br>
-4. What do you notice about the least-square loss?<br><br>
-5. What do you notice about the PSNR and SSIM scores? Are we over or underfitting at all?**<br><br>
+**- What do you notice about the virtual staining predictions? How do they appear compared to the regression-based approach? Can you spot any hallucinations?**<br><br> 
+**- What do you notice about the probabilities of the discriminators? How do the values compare during training compared to validation?**<br><br>
+**- What do you notice about the feature matching L1 loss?**<br><br>
+**- What do you notice about the least-square loss?**<br><br>
 </div>
 """
 
@@ -344,7 +276,6 @@ Please note down your thoughts about the following questions...
 <div class="alert alert-success">
     
 ## Checkpoint 2
-
 Congratulations! You should now have a better understanding the different loss components of Pix2PixHD GAN and how they are used to train the model. You should also have a good understanding of the fit of the model during training on the training and validation datasets.
 
 </div>
@@ -361,14 +292,18 @@ Steps:
 - Define our model parameters for the pre-trained model (these are the same parameters as shown in earlier cells but copied here for clarity).
 - Load the test data.
 
-We will first load the test data using the same format as the training and validation data. We will then use the model to predict the nuclei channel from the phase image. We will then evaluate the performance of the model using the following metrics:
+We will first load the test data using the same format as the training and validation data. We will then use the model to sample a virtual nuclei staining soltuion from the phase image. We will then evaluate the performance of the model using the following metrics:
 
 Pixel-level metrics:
 - [Peak-Signal-to-Noise-Ratio (PSNR)](https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio).
 - [Structural Similarity Index Measure (SSIM)](https://en.wikipedia.org/wiki/Structural_similarity).
+- [Pearson Correlation Coefficient (PCC)](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient).
 
-Instance-level metrics:
-- [F1 score](https://en.wikipedia.org/wiki/F1_score). via [Cellpose](https://cellpose.org/).
+Instance-level metrics via [Cellpose masks](https://cellpose.org/):
+- [Accuracy](https://en.wikipedia.org/wiki/Accuracy_and_precision#In_binary_classification)
+- [Jaccard Index](https://en.wikipedia.org/wiki/Jaccard_index)
+- [Dice Score](https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient)
+- [Mean Average Precision](https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Mean_average_precision)
 """
 
 # %%
@@ -412,8 +347,8 @@ opt.no_lsgan = ""  # Turn off least square loss
 # Additional Inference parameters
 opt.name = f"dlmbl_vsnuclei"
 opt.how_many = 112  # Number of images to generate.
-opt.checkpoints_dir = top_dir/f"GAN_code/GANs_MI2I/pre_trained/{opt.name}/"  # Path to the model checkpoints.
-opt.results_dir = top_dir/f"GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/"  # Path to store the results.
+opt.checkpoints_dir = f"{top_dir}/model_weights/"  # Path to the model checkpoints.
+opt.results_dir = f"{top_dir}/GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/"  # Path to store the results.
 opt.which_epoch = "latest"  # or specify the epoch number "40"
 opt.phase = "test"
 
@@ -427,7 +362,7 @@ Path(opt.results_dir).mkdir(parents=True, exist_ok=True)
 test_data_loader = CreateDataLoader(opt)
 test_dataset = test_data_loader.load_data()
 visualizer = Visualizer(opt)
-
+print(f"Total Test Images = {len(test_data_loader)}")
 # Load pre-trained model
 model = create_model(opt)
 
@@ -466,8 +401,46 @@ for index, (v_path, t_path, p_path) in tqdm(
 ### Task 3.1 Visualise the results of the model on the test set.
 
 Create a matplotlib plot that visalises random samples of the phase images, target stains, and virtual stains.
+If you can incorporate the crop function below to zoom in on the images that would be great!
 </div>
 """
+# %%
+# Define a function to crop the images so we can zoom in.
+def crop(img, crop_size, loc='center'):
+    """
+    Crop the input image.
+
+    Parameters:
+    img (ndarray): The image to be cropped.
+    crop_size (int): The size of the crop.
+    loc (str): The type of crop to perform. Can be 'center' or 'random'.
+
+    Returns:
+    ndarray: The cropped image array.
+    """
+    # Dimension of input array
+    width, height = img.shape
+
+    # Generate random coordinates for the crop
+    max_y = height - crop_size
+    max_x = max_y
+
+    if loc == 'random':
+        start_y = np.random.randint(0, max_y + 1)
+        start_x = np.random.randint(0, max_x + 1)
+        end_y = start_y + crop_size
+        end_x = start_x + crop_size
+    elif loc == 'center':
+        start_x = (width - crop_size) // 2
+        start_y = (height - crop_size) // 2
+        end_y = height - start_y
+        end_x = width - start_x
+    else:
+        raise ValueError(f'Unknown crop type {loc}')
+
+    # Crop array using slicing
+    crop_array = img[start_x:end_x, start_y:end_y]
+    return crop_array
 
 # %% tags=["task"]
 ##########################
@@ -485,80 +458,121 @@ def visualise_results():
 ######## Solution ########
 ##########################
 
-def visualise_results(
-    phase_images: np.array, target_stains: np.array, virtual_stains: np.array, crop_size=None
-):
+def visualise_results(phase_images, target_stains, virtual_stains, crop_size=None, loc='center'):
     """
-    Visualizes the results of the image processing algorithm.
-
-    Args:
-        phase_images (np.array): Array of phase images.
-        target_stains (np.array): Array of target stain images.
-        virtual_stains (np.array): Array of virtual stain images.
-        crop_size (int, optional): Size of the crop. Defaults to None.
-    """
-
+    Visualizes the results of image processing by displaying the phase images, target stains, and virtual stains.
+    Parameters:
+    - phase_images (np.array): Array of phase images.
+    - target_stains (np.array): Array of target stains.
+    - virtual_stains (np.array): Array of virtual stains.
+    - crop_size (int, optional): Size of the crop. Defaults to None.
+    - type (str, optional): Type of crop. Defaults to 'center' but can be 'random.
+    Returns:
+    None
+    """  
     fig, axes = plt.subplots(5, 3, figsize=(15, 20))
     sample_indices = np.random.choice(len(phase_images), 5)
-    if crop_size is not None:
-        phase_images = phase_images[:,:crop_size,:crop_size]
-        target_stains = target_stains[:,:crop_size,:crop_size]
-        virtual_stains = virtual_stains[:,:crop_size,:crop_size]
-    for i, idx in enumerate(sample_indices):
-        axes[i, 0].imshow(phase_images[idx], cmap="gray")
-        axes[i, 0].set_title("Phase")
-        axes[i, 0].axis("off")
-        axes[i, 1].imshow(
-            target_stains[idx],
+    for index,sample in enumerate(sample_indices):
+        if crop_size:
+            phase_image = crop(phase_images[index], crop_size, loc)
+            target_stain = crop(target_stains[index], crop_size, loc)
+            virtual_stain = crop(virtual_stains[index], crop_size, loc)
+        else:
+            phase_image = phase_images[index]
+            target_stain = target_stains[index]
+            virtual_stain = virtual_stains[index]  
+
+        axes[index, 0].imshow(phase_image, cmap="gray")
+        axes[index, 0].set_title("Phase")
+        axes[index, 1].imshow(
+            target_stain,
             cmap="gray",
-            vmin=np.percentile(target_stains[idx], 1),
-            vmax=np.percentile(target_stains[idx], 99),
+            vmin=np.percentile(target_stain, 1),
+            vmax=np.percentile(target_stain, 99),
         )
-        axes[i, 1].set_title("Target Fluorescence ")
-        axes[i, 1].axis("off")
-        axes[i, 2].imshow(
-            virtual_stains[idx],
+        axes[index, 1].set_title("Target Fluorescence ")
+        axes[index, 2].imshow(
+            virtual_stain,
             cmap="gray",
-            # vmin=np.percentile(target_stains[idx], 1),
-            # vmax=np.percentile(target_stains[idx], 99),
+            vmin=np.percentile(target_stain, 1),
+            vmax=np.percentile(target_stain, 99),
         )
-        axes[i, 2].set_title("Virtual Stain")
-        axes[i, 2].axis("off")
+        axes[index, 2].set_title("Virtual Stain")
+    for ax in axes.flatten():
+        ax.axis("off")
     plt.tight_layout()
     plt.show()
-visualise_results(phase_images, target_stains,virtual_stains)
+
+visualise_results(phase_images, target_stains,virtual_stains,crop_size=None)
 # %% [markdown] tags=[]
 """
 <div class="alert alert-info">
 
 ### Task 3.2 Compute pixel-level metrics
 
-Compute the pixel-level metrics for the virtual stains and target stains. The metrics include Pearson correlation, SSIM, and PSNR.
+Compute the pixel-level metrics for the virtual stains and target stains.
+
+The following code will compute the following:
+- the pixel-based metrics  (Pearson correlation, SSIM, PSNR) for the virtual stains and target stains.
+
 </div>
 """
 # %%
-test_metrics = pd.DataFrame(columns=["pearson_nuc", "SSIM_nuc", "psnr_nuc"])
-# Pixel-level metrics
-for i, (target_image, predicted_image) in enumerate(zip(target_stains, virtual_stains)):
-    # Compute SSIM and pearson correlation.
-    ssim_score = metrics.structural_similarity(
-        target_image, predicted_image, data_range=1
-    )
-    pearson_score = np.corrcoef(target_image.flatten(), predicted_image.flatten())[0, 1]
-    psnr_score = metrics.peak_signal_noise_ratio(
-        target_image, predicted_image, data_range=1
-    )
-    test_metrics.loc[i] = {
-        "pearson_nuc": pearson_score,
-        "SSIM_nuc": ssim_score,
-        "psnr_nuc": psnr_score,
-    }
 
-test_metrics.boxplot(
-    column=["pearson_nuc", "SSIM_nuc"], #,, "psnr_nuc"],
-    rot=30,
+# Define the function to perform  minmax normalization which is required for the pixel-level metrics.
+def min_max_scale(input):
+    return (input - np.min(input)) / (np.max(input) - np.min(input))
+
+# Create a dataframe to store the pixel-level metrics.
+test_pixel_metrics = pd.DataFrame(
+    columns=["model", "fov","pearson_nuc", "ssim_nuc", "psnr_nuc"]
 )
 
+# Compute the pixel-level metrics.
+for i, (target_stain, predicted_stain) in tqdm(enumerate(zip(target_stains, virtual_stains))):
+    fov = str(virtual_stain_paths[i]).split("/")[-1].split(".")[0]
+    minmax_norm_target = min_max_scale(target_stain)
+    minmax_norm_predicted = min_max_scale(predicted_stain)
+    
+    # Compute SSIM
+    ssim_nuc = metrics.structural_similarity(
+        minmax_norm_target, minmax_norm_predicted, data_range=1
+    )
+    # Compute Pearson correlation
+    pearson_nuc = np.corrcoef(
+        minmax_norm_target.flatten(), minmax_norm_predicted.flatten()
+        )[0, 1]
+    # Compute PSNR
+    psnr_nuc = metrics.peak_signal_noise_ratio(
+        minmax_norm_target, minmax_norm_predicted, data_range=1
+    )
+    
+    test_pixel_metrics.loc[len(test_pixel_metrics)] = {
+            "model": "pix2pixHD",
+            "fov":fov,
+            "pearson_nuc": pearson_nuc,
+            "ssim_nuc": ssim_nuc,
+            "psnr_nuc": psnr_nuc, 
+        }
+    
+test_pixel_metrics.boxplot(
+    column=["pearson_nuc", "ssim_nuc"],
+    rot=30,
+)
+# %%
+test_pixel_metrics.boxplot(
+    column=["psnr_nuc"],
+    rot=30,
+)
+# %%
+test_pixel_metrics.head()
+# %% [markdown]
+"""
+- What do these metrics tells us about the performance of the model?
+- How do the pixel-level metrics compare to the regression-based approach?
+- Could these metrics be skewed by the presence of hallucinations or background pilxels in the virtual stains?
+
+"""
 # %% [markdown]
 
 """
@@ -566,135 +580,136 @@ test_metrics.boxplot(
 
 ### Task 3.3 Compute instance-level metrics
 
-- Use Cellpose to segment the nuclei or  membrane channels of the fluorescence and virtual staining images.
-- Compute the F1 score for the segmentation masks.
+- Compute the instance-level metrics for the virtual stains and target stains.
+- Instance metrics include the accuracy (average correct predictions with 0.5 threshold), jaccard index (intersection over union (IoU)) dice score (2x intersection over union), mean average precision, mean average precision at 50% IoU, mean average precision at 75% IoU, and mean average recall at 100% IoU.
 
 
 </div>
 """
 # %%
-# Run cellpose to generate masks for the virtual stains
-path_to_virtual_stain = Path(opt.results_dir)
-path_to_targets = Path(f"{output_image_folder}/test/")
-cellpose_model = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
+
+# Use the same function as previous part to extract the nuclei masks from pre-trained cellpose model.
+def cellpose_segmentation(prediction:ArrayLike,target:ArrayLike)->Tuple[torch.ShortTensor]:
+    # NOTE these are hardcoded for this notebook and A549 dataset
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    cp_nuc_kwargs = {
+        "diameter": 65,
+        "channels": [0], 
+        "cellprob_threshold": 0.0, 
+    }
+    cellpose_model = models.CellposeModel(
+            gpu=True, model_type='nuclei', device=torch.device(device)
+    )
+    pred_label, _, _ = cellpose_model.eval(prediction, **cp_nuc_kwargs)
+    target_label, _, _ = cellpose_model.eval(target, **cp_nuc_kwargs)
+
+    pred_label = pred_label.astype(np.int32)
+    target_label = target_label.astype(np.int32)
+    pred_label = torch.ShortTensor(pred_label)
+    target_label = torch.ShortTensor(target_label)
+
+    return (pred_label,target_label)
+
+# Define dataframe to store the segmentation metrics.
+test_segmentation_metrics= pd.DataFrame(
+    columns=["model", "fov","masks_per_fov","accuracy","dice","jaccard","mAP","mAP_50","mAP_75","mAR_100"]
+)
+# Define tuple to store the segmentation results. Each value in the tuple is a dictionary containing the model name, fov, predicted label, predicted stain, target label, and target stain.
+segmentation_results = ()
+
+for i, (target_stain, predicted_stain) in tqdm(enumerate(zip(target_stains, virtual_stains))):
+    fov = str(virtual_stain_paths)[i].spilt("/")[-1].split(".")[0]
+    minmax_norm_target = min_max_scale(target_stain)
+    minmax_norm_predicted = min_max_scale(predicted_stain)
+    # Compute the segmentation masks.
+    pred_label, target_label = cellpose_segmentation(minmax_norm_predicted, minmax_norm_target)
+     # Binary labels
+    pred_label_binary = pred_label > 0
+    target_label_binary = target_label > 0
+
+    # Use Coco metrics to get mean average precision
+    coco_metrics = mean_average_precision(pred_label, target_label)
+    # Find unique number of labels
+    num_masks_fov = len(np.unique(pred_label))
+    # Find unique number of labels
+    num_masks_fov = len(np.unique(pred_label))
+    # Compute the segmentation metrics.
+    test_segmentation_metrics.loc[len(test_segmentation_metrics)] = {
+        "model": "pix2pixHD",
+        "fov":fov,
+        "masks_per_fov": num_masks_fov,
+        "accuracy": accuracy(pred_label_binary, target_label_binary, task="binary").item(),
+        "dice":  dice(pred_label_binary, target_label_binary).item(),
+        "jaccard": jaccard_index(pred_label_binary, target_label_binary, task="binary").item(),
+        "mAP":coco_metrics["map"].item(),
+        "mAP_50":coco_metrics["map_50"].item(),
+        "mAP_75":coco_metrics["map_75"].item(),
+        "mAR_100":coco_metrics["mar_100"].item()
+        }
+    # Store the segmentation results.
+    segmentation_result = {
+        "model": "pix2pixHD",
+        "fov":fov,
+        "phase_image": phase_images[i],
+        "pred_label": pred_label,
+        "pred_stain": predicted_stain,
+        "target_label": target_label,
+        "target_stain": target_stain,
+    }
+    segmentation_results += (segmentation_result,)
+
+test_segmentation_metrics.head()
 # %%
-# Run for virtual stain
-import subprocess
-command = [ "python", "-m", "cellpose", "--dir", top_dir"/GAN_code/GANs_MI2I/pre_trained/dlmbl_vsnuclei/inference_results", "--pretrained_model", "nuclei","--chan", "0", "--save_tif", "--verbose"]
-result = subprocess.run(command,capture_output=True, text=True)
-print(result.stdout)
-print(result.stderr)
-# %%
-predicted_masks = sorted([i for i in path_to_virtual_stain.glob("**/*_cp_masks.tif*")])
-target_masks = sorted([i for i in top_dir/Path('tiff_files/nuclei/masks/').glob("**/*.tiff")])
-print(predicted_masks[:3], target_masks[:3])
-assert len(predicted_masks) == len(target_masks), f"Number of masks do not match {len(predicted_masks)}, {len(target_masks)}"
-# %%
+# Define function to visualize the segmentation results.
+def visualise_results_and_masks(segmentation_results: Tuple[dict], rows: int = 5, crop_size: int = None, crop_type: str = 'center'):
 
+    # Sample a subset of the segmentation results.
+    sample_indices = np.random.choice(len(phase_images),rows)
+    segmentation_results_subset = segmentation_results[sample_indices]
+    segmentation_metrics_subset = test_segmentation_metrics.iloc[sample_indices]
+    # Define the figure and axes.
+    fig, axes = plt.subplots(rows, 5, figsize=(rows*3, 15))
 
-def visualise_results_and_masks(
-    phase_images: np.array, target_stains: np.array, virtual_stains: np.array, target_masks_paths: list, virtual_masks_paths: list, crop_size=None
-):
-    """
-    Visualizes the results of the image processing algorithm.
-
-    Args:
-        phase_images (np.array): Array of phase images.
-        target_stains (np.array): Array of target stain images.
-        virtual_stains (np.array): Array of virtual stain images.
-        target_masks_paths (list): list of target stain mask paths.
-        virtual_masks_paths (list): list of virtual stain mask paths.
-        crop_size (int, optional): Size of the crop. Defaults to None.
-    """
-
-    fig, axes = plt.subplots(3, 5, figsize=(15, 20))
-    sample_indices = np.random.choice(len(phase_images),3)
-    if crop_size is not None:
-        phase_images = phase_images[:,:crop_size,:crop_size]
-        target_stains = target_stains[:,:crop_size,:crop_size]
-        virtual_stains = virtual_stains[:,:crop_size,:crop_size]
-        
-    for i, idx in enumerate(sample_indices):
-        axes[i, 0].imshow(phase_images[idx], cmap="gray")
+    # Visualize the segmentation results.
+    for i, idx in enumerate(segmentation_results_subset):
+        result = segmentation_results[idx]
+        segmentation_metrics = segmentation_metrics_subset.iloc[i]
+        phase_image = result["phase_image"]
+        target_stain = result["target_stain"]
+        target_label = result["target_label"]
+        pred_stain = result["pred_stain"]
+        pred_label = result["pred_label"]
+        # Crop the images if required. Zoom into instances
+        if crop_size is not None:
+            phase_image = crop(phase_image, crop_size, crop_type)
+            target_stain = crop(target_stain, crop_size, crop_type)
+            target_label = crop(target_label, crop_size, crop_type)
+            pred_stain = crop(pred_stain, crop_size, crop_type)
+            pred_label = crop(pred_label, crop_size, crop_type)
+        axes[i, 0].imshow(phase_image, cmap="gray")
         axes[i, 0].set_title("Phase")
-        axes[i, 0].axis("off")
         axes[i, 1].imshow(
-            target_stains[idx],
+            target_stain,
             cmap="gray",
-            vmin=np.percentile(target_stains[idx], 1),
-            vmax=np.percentile(target_stains[idx], 99),
+            vmin=np.percentile(target_stain, 1),
+            vmax=np.percentile(target_stain, 99),
         )
-        axes[i, 1].set_title("Target Fluorescence ")
-        axes[i, 1].axis("off")
-        target_mask = imread(target_masks_paths[idx]).astype(np.uint8)
-        axes[i, 2].imshow(
-            target_mask,
-            cmap="inferno",)
-        axes[i, 2].set_title("Target Fluorescence Mask")
-        axes[i, 2].axis("off")
-        axes[i, 3].imshow(
-            virtual_stains[idx],
-            cmap="gray",
-            # vmin=np.percentile(target_stains[idx], 1),
-            # vmax=np.percentile(target_stains[idx], 99),
-        )
-        axes[i, 3].set_title("Virtual Stain")
-        axes[i, 3].axis("off")
-        virtual_mask = imread(virtual_masks_paths[idx]).astype(np.uint8)       
-        axes[i, 4].imshow(
-            virtual_mask,
-            cmap="inferno",
-            # vmin=np.percentile(target_stains[idx], 1),
-            # vmax=np.percentile(target_stains[idx], 99),
-        )
-        axes[i, 4].set_title("Virtual Stain Mask")
-        axes[i, 4].axis("off")
+        axes[i, 1].set_title("Target Fluorescence")
+        axes[i, 2].imshow(pred_stain, cmap="gray")
+        axes[i, 2].set_title("Virtual Stain")
+        axes[i, 3].imshow(target_label, cmap="inferno")
+        axes[i, 3].set_title("Target Fluorescence Mask")
+        axes[i, 4].imshow(pred_label, cmap="inferno")
+        # Add Metric values to the title
+        axes[i, 4].set_title(f"Virtual Stain Mask\nAcc:{segmentation_metrics['accuracy']:.2f} Dice:{segmentation_metrics['dice']:.2f} Jaccard:{segmentation_metrics['jaccard']:.2f} MAP:{segmentation_metrics['mAP']:.2f}")
+    # Turn off the axes.
+    for ax in axes.flatten():
+        ax.axis("off")
+
     plt.tight_layout()
     plt.show()
     
-visualise_results_and_masks(phase_images, target_stains,virtual_stains,target_masks,predicted_masks)
-# %% [markdown]
-# Use a predefined function to compute F1 score and its component parts.
-
-# %%
-# Generate dataframe to store the outputs
-results = pd.DataFrame(
-    columns=[
-        'Model', 'Image', 'GT_Cell_Count','Threshold', 'F1', 'IoU',
-        'TP', 'FP', 'FN', 'Precision', 'Recall'
-    ],
-) 
-# Create inputs to function
-image_sets = []
-for i in range(len(predicted_masks)):
-    name = str(predicted_masks[i]).split("/")[-1] 
-    virtual_stain_mask = imread(predicted_masks[i])
-    fluorescence_mask = imread(target_masks[i])  
-    image_sets.append(
-        {
-            "Image": name,
-            "Model": "Pix2PixHD",
-            "Virtual_Stain_Mask": virtal_stain_mask,
-            "Fluorescence_Mask": fluorescence_mask,
-        }
-    )
-# Compute the segmentation scores
-results, _, _ = \
-    gen_segmentation_scores(
-        image_sets, results, final_score_output=top_dir/f"GAN_code/GANs_MI2I/pre_trained/{opt.name}/inference_results/")
-
-results.head()
-# %%
-# Get Mean F1 results
-mean_f1 = results["F1"].mean()
-std_f1 = results["F1"].std()
-print(f"Mean F1 Score: {np.round(mean_f1,2)}")
-
-plt.hist(results["F1"], bins=10)
-plt.xlabel("F1 Score")
-plt.ylabel("Frequency")
-plt.title(f"F1 Score: Mu {mean_f1}+-{std_f1}")
-
+visualise_results_and_masks(segmentation_results, crop_size=256, crop_type='center')
 # %% [markdown]
 """
 <div class="alert alert-success">
@@ -702,7 +717,7 @@ plt.title(f"F1 Score: Mu {mean_f1}+-{std_f1}")
 ## Checkpoint 3
 
 Congratulations! You have generated predictions from a pre-trained model and evaluated the performance of the model on unseen data. You have computed pixel-level metrics and instance-level metrics to evaluate the performance of the model. You may have also began training your own Pix2PixHD GAN models with alternative hyperparameters.
-Please document hyperparameters, snapshots of predictions on validation set, and loss curves for your models and add the final perforance in [this google doc](ADD LINK TO SHARED DOC). We"ll discuss our combined results as a group.
+
 </div>
 """
 
@@ -738,15 +753,16 @@ def visualise_both_methods():
 ##########################
 
 def visualise_both_methods(
-    phase_images: np.array, target_stains: np.array, pix2pixHD_results: np.array, viscy_results: np.array,crop_size=None
+    phase_images: np.array, target_stains: np.array, pix2pixHD_results: np.array, viscy_results: np.array,crop_size=None,crop_type='center'
 ):
     fig, axes = plt.subplots(5, 4, figsize=(15, 15))
     sample_indices = np.random.choice(len(phase_images), 5)
-    if crop is not None:
-        phase_images = phase_images[:,:crop_size,:crop_size]
-        target_stains = target_stains[:,:crop_size,:crop_size]
-        pix2pixHD_results = pix2pixHD_results[:,:crop_size,:crop_size]
-        viscy_results = viscy_results[:,:crop_size,:crop_size]
+    if crop_size is not None:
+            phase_image = crop(phase_image, crop_size, crop_type)
+            target_stain = crop(target_stain, crop_size, crop_type)
+            target_label = crop(target_label, crop_size, crop_type)
+            pred_stain = crop(pred_stain, crop_size, crop_type)
+            pred_label = crop(pred_label, crop_size, crop_type)
 
     for i, idx in enumerate(sample_indices):
         axes[i, 0].imshow(phase_images[idx], cmap="gray")
@@ -801,7 +817,7 @@ visualizer = Visualizer(opt)
 
 # Load pre-trained model
 opt.variational_inf_runs = 100 # Number of samples per phase input
-opt.variation_inf_path = top_dir= f"GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples/"  # Path to store the samples.
+opt.variation_inf_path = f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples/"  # Path to store the samples.
 opt.dropout_variation_inf = True  # Use dropout during inference.
 model = create_model(opt)
 # Generate & save predictions in the variation_inf_path directory.
@@ -809,7 +825,7 @@ sampling(test_dataset, opt, model)
                                       
 # %%
 # Visualise Samples                                      
-samples = sorted([i for i in top_dir/Path(f"GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples").glob("**/*mask*.tif*")])
+samples = sorted([i for i in Path(f"./GAN_code/GANs_MI2I/pre_trained/{opt.name}/samples").glob("**/*mask*.tif*")])
 # Create arrays to store the images.
 sample_images = np.zeros((len(samples),112, 512, 512)) # (samples, images, height, width)
 # Load the images and store them in the arrays.
