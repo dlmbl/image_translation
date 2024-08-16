@@ -136,9 +136,9 @@ top_dir = Path(
 )  # TODO: Change this to point to your data directory.
 
 data_path = (
-    top_dir / "06_image_translation/training/a549_hoechst_cellmask_train_val.zarr"
+    top_dir / "06_image_translation/part1/training/a549_hoechst_cellmask_train_val.zarr"
 )
-log_dir = top_dir / "06_image_translation/logs/"
+log_dir = top_dir / "06_image_translation/part1/logs/"
 
 if not data_path.exists():
     raise FileNotFoundError(
@@ -766,7 +766,7 @@ Let's compute metrics directly and plot below.
 """
 # %%
 # Setup the test data module.
-test_data_path = top_dir / "06_image_translation/test/a549_hoechst_cellmask_test.zarr"
+test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
 source_channel = ["Phase3D"]
 target_channel = ["Nucl", "Mem"]
 
@@ -881,7 +881,7 @@ for i, sample in enumerate(test_data.test_dataloader()):
 Here we will compare your model with the VSCyto2D pretrained model by computing the pixel-based metrics and segmentation-based metrics.
  
 <ul>
-<li>When you ran the `setup.sh` you also downloaded the models in `/06_image_translation/pretrained_models/VSCyto2D/*.ckpt`</li>
+<li>When you ran the `setup.sh` you also downloaded the models in `/06_image_translation/part1/pretrained_models/VSCyto2D/*.ckpt`</li>
 <li>Load the <b>VSCyto2 model</b> model checkpoint and the configuration file</li>
 <li>Compute the pixel-based metrics and segmentation-based metrics between the model you trained and the pretrained model</li>
 </ul>
@@ -916,7 +916,7 @@ pretrained_phase2fluor = VSUNet.load_from_checkpoint(
 # #######################
 
 pretrained_model_ckpt = (
-    top_dir / "06_image_translation/pretrained_models/VSCyto2D/epoch=399-step=23200.ckpt"
+    top_dir / "06_image_translation/part1/pretrained_models/VSCyto2D/epoch=399-step=23200.ckpt"
 )
 
 phase2fluor_config = dict(
@@ -941,7 +941,7 @@ pretrained_phase2fluor.eval()
 #NOTE: assuming the latest checkpoint it your latest training and model
 #TODO: modify above is not the case
 phase2fluor_model_ckpt = natsorted(glob(
-    str(top_dir / "06_image_translation/logs/phase2fluor/version*/checkpoints/*.ckpt")
+    str(top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
 ))[-1]
 
 phase2fluor_config = dict(
@@ -1005,8 +1005,8 @@ def cellpose_segmentation(prediction:ArrayLike,target:ArrayLike)->Tuple[torch.Sh
 
 #%% 
 # Setting the paths for the test data and the output segmentation
-test_data_path = top_dir / "06_image_translation/test/a549_hoechst_cellmask_test.zarr"
-output_segmentation_path=top_dir /"06_image_translation/pretrained_model_segmentations.zarr"
+test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
+output_segmentation_path=top_dir /"06_image_translation/part1/pretrained_model_segmentations.zarr"
 
 # Creating the dataframes to store the pixel and segmentation metrics
 test_pixel_metrics = pd.DataFrame(
@@ -1192,8 +1192,8 @@ test_dataset.close()
 segmentation_store.close()
 #%%
 #Save the test metrics into a dataframe
-pixel_metrics_path = top_dir/"06_image_translation/VS_metrics_pixel_part_1.csv"
-segmentation_metrics_path = top_dir/"06_image_translation/VS_metrics_segments_part_1.csv"
+pixel_metrics_path = top_dir/"06_image_translation/part1/VS_metrics_pixel_part_1.csv"
+segmentation_metrics_path = top_dir/"06_image_translation/part1/VS_metrics_segments_part_1.csv"
 test_pixel_metrics.to_csv(pixel_metrics_path)
 test_segmentation_metrics.to_csv(segmentation_metrics_path)
 

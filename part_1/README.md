@@ -71,7 +71,7 @@ The matching exercise and solution notebooks can be found [here](https://github.
 Launch a jupyter environment
 
 ```
-jupyter notebook
+jupyter lab
 ```
 
 ...and continue with the instructions in the notebook.
