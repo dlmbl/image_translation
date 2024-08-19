@@ -790,7 +790,7 @@ def min_max_scale(input):
     return (input - np.min(input)) / (np.max(input) - np.min(input))
 
 
-for i, sample in enumerate(tqdm(test_data.test_dataloader(), desc="Computting metrics per sample")):
+for i, sample in enumerate(tqdm(test_data.test_dataloader(), desc="Computing metrics per sample")):
     phase_image = sample["source"]
     with torch.inference_mode():  # turn off gradient computation.
         predicted_image = phase2fluor_model(phase_image)
