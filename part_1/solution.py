@@ -157,17 +157,6 @@ The next cell starts tensorboard.
 If you launched jupyter lab from ssh terminal, add <code>--host &lt;your-server-name&gt;</code> to the tensorboard command below. <code>&lt;your-server-name&gt;</code> is the address of your compute node that ends in amazonaws.com.
 
 </div>
-
-<div class="alert alert-warning">
-If you are using VSCode and a remote server, you will need to forward the port to view the tensorboard. <br>
-Take note of the port number was assigned in the previous cell.(i.e <code> http://localhost:{port_number_assigned}</code>) <br>
-
-Locate the your VSCode terminal and select the <code>Ports</code> tab <br>
-<ul>
-<li>Add a new port with the <code>port_number_assigned</code>
-</ul>
-Click on the link to view the tensorboard and it should open in your browser.
-</div>
 """
 
 # %% Imports and paths tags=[]
@@ -198,6 +187,20 @@ def launch_tensorboard(log_dir):
 
 # Launch tensorboard and click on the link to view the logs.
 tensorboard_process = launch_tensorboard(log_dir)
+# %% [markdown] tags = []
+"""
+<div class="alert alert-warning">
+If you are using VSCode and a remote server, you will need to forward the port to view the tensorboard. <br>
+Take note of the port number was assigned in the previous cell.(i.e <code> http://localhost:{port_number_assigned}</code>) <br>
+
+Locate the your VSCode terminal and select the <code>Ports</code> tab <br>
+<ul>
+<li>Add a new port with the <code>port_number_assigned</code>
+</ul>
+Click on the link to view the tensorboard and it should open in your browser.
+</div>
+"""
+
 
 # %% [markdown]
 """
