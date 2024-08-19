@@ -54,7 +54,7 @@ conda activate 06_image_translation
 
 ## Use vscode
 
-Install vscode, install jupyter extension inside vscode, and setup [cell mode](https://code.visualstudio.com/docs/python/jupyter-support-py). Open [solution.py](solution.py) and run the script interactively.
+Install vscode, install jupyter extension inside vscode, and setup [cell mode](https://code.visualstudio.com/docs/python/jupyter-support-py). Open [exercise.py](exercise.py) and run the script interactively.
 
 ## Use Jupyter Notebook / Lab
 
