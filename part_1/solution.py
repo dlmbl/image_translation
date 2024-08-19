@@ -927,7 +927,7 @@ phase2fluor_model = VSUNet.load_from_checkpoint(
 )
 phase2fluor_model.eval()
 
-# %%[markdown]
+# %% [markdown]
 # ### Let's compute the metrics for the test dataset
 # Before you run the following code, make sure you have the pretrained model loaded and the test data is ready.
 
@@ -1197,13 +1197,13 @@ test_segmentation_metrics.boxplot(
 plt.suptitle("Model Segmentation Metrics")
 plt.show()
 
-# %%[markdown]
+# %% [markdown]
 # ########## TODO ##############
 # - What do these metrics tells us about the performance of the model?
 # - How do you interpret the differences in the metrics between the models?
 # - How is your model compared to the pretrained model? How can you improve it?
 
-# %%[markdown]
+# %% [markdown]
 # ## Plotting the predictions and segmentations
 # Here we will plot the predictions and segmentations side by side for the pretrained and trained models.
 
