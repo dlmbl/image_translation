@@ -449,7 +449,7 @@ log_batch_jupyter(batch)
 # HINT:
 # [Compare your choice of augmentations by dowloading the pretrained models and config files](https://github.com/mehta-lab/VisCy/releases/download/v0.1.0/VisCy-0.1.0-VS-models.zip).
 # </div>
-# %%
+# %% tags=["task"]
 # Here we turn on data augmentation and rerun setup
 source_channel = ["Phase3D"]
 target_channel = ["Nucl", "Mem"]
@@ -872,7 +872,7 @@ for i, sample in enumerate(test_data.test_dataloader()):
 # </div>
 
 
-# %% tags=[]
+# %% tags=["task"]
 #################
 ##### TODO ######
 #################
