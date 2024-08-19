@@ -132,8 +132,8 @@ seed_everything(42, workers=True)
 
 # Paths to data and log directory
 top_dir = Path(
-    f"/hpc/mydata/{os.environ['USER']}/data/"
-)  # TODO: Change this to point to your data directory.
+    f"/{os.environ['HOME']}/data/"
+)  # If this fails, make sure this to point to your data directory.
 
 data_path = (
     top_dir / "06_image_translation/part1/training/a549_hoechst_cellmask_train_val.zarr"
@@ -785,7 +785,7 @@ test_metrics = pd.DataFrame(
     columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
 )
 
-# %% 
+# %%
 # Compute metrics directly and plot here.
 def min_max_scale(input):
     return (input - np.min(input)) / (np.max(input) - np.min(input))
@@ -898,7 +898,7 @@ segmantation based metrics including (mAP@0.5, dice, accuracy and jaccard index)
 #################
 ##### TODO ######
 #################
-# Let's load the pretrained model checkpoint  
+# Let's load the pretrained model checkpoint
 pretrained_model_ckpt = top_dir/...## Add the path to the "VSCyto2D/epoch=399-step=23200.ckpt"
 
 # TODO: Load the phase2fluor_config just like the model you trained
@@ -938,9 +938,9 @@ pretrained_phase2fluor = VSUNet.load_from_checkpoint(
 )
 pretrained_phase2fluor.eval()
 
-### Re-load your trained model 
-#NOTE: assuming the latest checkpoint it your latest training and model
-#TODO: modify above is not the case
+### Re-load your trained model
+# NOTE: assuming the latest checkpoint it your latest training and model
+# TODO: modify above is not the case
 phase2fluor_model_ckpt = natsorted(glob(
     str(top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
 ))[-1]
@@ -963,7 +963,7 @@ phase2fluor_model = VSUNet.load_from_checkpoint(
 )
 phase2fluor_model.eval()
 
-#%%[markdown]
+# %%[markdown]
 """
 ### Let's compute the metrics for the test dataset
 Before you run the following code, make sure you have the pretrained model loaded and the test data is ready.
@@ -978,7 +978,7 @@ The following code will compute the following:
 - The segmentations will be stored in the `segmentation_store` zarr file
 - Analyze the code while it runs.
 """
-#%%
+# %%
 # Define the function to compute the cellpose segmentation and the normalization
 def min_max_scale(input):
     return (input - np.min(input)) / (np.max(input) - np.min(input))
@@ -1004,7 +1004,7 @@ def cellpose_segmentation(prediction:ArrayLike,target:ArrayLike)->Tuple[torch.Sh
 
     return (pred_label,target_label)
 
-#%% 
+# %%
 # Setting the paths for the test data and the output segmentation
 test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
 output_segmentation_path=top_dir /"06_image_translation/part1/pretrained_model_segmentations.zarr"
@@ -1034,7 +1034,7 @@ nuc_cidx = channel_names.index("Nucl")
 mem_cidx =  channel_names.index("Mem")
 nuc_label_cidx =  channel_names.index("nuclei_segmentation")
 
-#%%
+# %%
 # Iterating through the test dataset positions to:
 positions = list(test_dataset.positions())
 total_positions = len(positions)
@@ -1191,8 +1191,8 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
 # Close the OME-Zarr files
 test_dataset.close()
 segmentation_store.close()
-#%%
-#Save the test metrics into a dataframe
+# %%
+# Save the test metrics into a dataframe
 pixel_metrics_path = top_dir/"06_image_translation/part1/VS_metrics_pixel_part_1.csv"
 segmentation_metrics_path = top_dir/"06_image_translation/part1/VS_metrics_segments_part_1.csv"
 test_pixel_metrics.to_csv(pixel_metrics_path)
@@ -1215,7 +1215,7 @@ After you plot the metrics answer the following:
 </div>
 
 """
-#%%
+# %%
 # Show boxplot of the metrics
 # Boxplot of the metrics
 test_pixel_metrics.boxplot(
@@ -1237,7 +1237,7 @@ test_segmentation_metrics.boxplot(
 plt.suptitle("Model Segmentation Metrics")
 plt.show()
 
-#%%[markdown]
+# %%[markdown]
 """
 ########## TODO ##############
 - What do these metrics tells us about the performance of the model?
@@ -1246,14 +1246,14 @@ plt.show()
 
 """
 
-#%%[markdown]
+# %%[markdown]
 """
 ## Plotting the predictions and segmentations
 Here we will plot the predictions and segmentations side by side for the pretrained and trained models.
 
 Please modify the crop size and Y,X slicing to view different areas of the FOV.
 """
-#%%
+# %%
 ######## TODO ##########
 # Modify the crop size and Y,X slicing to view different areas of the FOV
 crop = 256
