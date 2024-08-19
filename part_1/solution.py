@@ -785,7 +785,8 @@ test_metrics = pd.DataFrame(
     columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
 )
 
-# %% Compute metrics directly and plot here.
+# %% 
+# Compute metrics directly and plot here.
 def min_max_scale(input):
     return (input - np.min(input)) / (np.max(input) - np.min(input))
 
@@ -906,7 +907,7 @@ phase2fluor_config = dict() ##
 # TODO: Load the checkpoint. Write the architecture name. HINT: look at the previous config.
 pretrained_phase2fluor = VSUNet.load_from_checkpoint(
     pretrained_model_ckpt,
-    architecture=....,
+    architecture=...,
     module_config=phase2fluor_config,
 )
 
