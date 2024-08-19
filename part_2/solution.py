@@ -661,17 +661,17 @@ for i, (target_stain, predicted_stain) in tqdm(enumerate(zip(target_stains, virt
 test_segmentation_metrics.head()
 # %%
 # Define function to visualize the segmentation results.
-def visualise_results_and_masks(segmentation_results: Tuple[dict], rows: int = 5, crop_size: int = None, crop_type: str = 'center'):
+def visualise_results_and_masks(segmentation_results, test_segmentation_metrics: Tuple[dict], rows: int = 5, crop_size: int = None, crop_type: str = 'center'):
 
     # Sample a subset of the segmentation results.
     sample_indices = np.random.choice(len(phase_images),rows)
-    segmentation_results_subset = segmentation_results[sample_indices]
-    segmentation_metrics_subset = test_segmentation_metrics.iloc[sample_indices]
+    segmentation_metrics_subset = segmentation_metrics_subset.iloc[sample_indices,:]
+    segmentation_results = [segmentation_results[i] for i in sample_indices]
     # Define the figure and axes.
     fig, axes = plt.subplots(rows, 5, figsize=(rows*3, 15))
 
     # Visualize the segmentation results.
-    for i, idx in enumerate(segmentation_results_subset):
+    for i, idx in enumerate(test_segmentation_metrics):
         result = segmentation_results[idx]
         segmentation_metrics = segmentation_metrics_subset.iloc[i]
         phase_image = result["phase_image"]
@@ -709,7 +709,7 @@ def visualise_results_and_masks(segmentation_results: Tuple[dict], rows: int = 5
     plt.tight_layout()
     plt.show()
     
-visualise_results_and_masks(segmentation_results, crop_size=256, crop_type='center')
+visualise_results_and_masks(test_segmentation_metrics, crop_size=256, crop_type='center')
 # %% [markdown]
 """
 <div class="alert alert-success">
