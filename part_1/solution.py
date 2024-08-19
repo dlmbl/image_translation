@@ -1,6 +1,6 @@
 # %% [markdown]
 """
-# Image translation (Virtual Staining - Part 1
+# Image translation (Virtual Staining) - Part 1
 
 Written by Eduardo Hirata-Miyasaki, Ziwen Liu, and Shalin Mehta, CZ Biohub San Francisco.
 
@@ -59,7 +59,7 @@ and their performance with everyone via
 """
 # %% [markdown]
 """
-<div class="alert alert-warning">
+<div class="alert alert-info">
 The exercise is organized in 2 parts 
 
 <ul>
@@ -599,7 +599,7 @@ phase2fluor_model = VSUNet(
     model_config=phase2fluor_config.copy(),
     loss_function=MixedLoss(l1_alpha=0.5, l2_alpha=0.0, ms_dssim_alpha=0.5),
     schedule="WarmupCosine",
-    lr=2e-4,
+    lr=2e-6,
     log_batches_per_epoch=5,  # Number of samples from each batch to log to tensorboard.
     freeze_encoder=False,
 )
@@ -790,7 +790,7 @@ def min_max_scale(input):
     return (input - np.min(input)) / (np.max(input) - np.min(input))
 
 
-for i, sample in enumerate(test_data.test_dataloader()):
+for i, sample in enumerate(tqdm(test_data.test_dataloader(), desc="Computting metrics per sample")):
     phase_image = sample["source"]
     with torch.inference_mode():  # turn off gradient computation.
         predicted_image = phase2fluor_model(phase_image)

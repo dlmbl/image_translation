@@ -43,14 +43,6 @@ VisCy exploits recent advances in data and metadata formats
 
 Make sure that you are inside of the `image_translation` folder by using the `cd` command to change directories if needed.
 
-Make sure that you can use conda to switch environments.
-
-```bash
-conda init
-```
-
-**Close your shell, and login again.** 
-
 Run the setup script to create the environment for this exercise and download the dataset.
 ```bash
 sh setup.sh
@@ -64,11 +56,11 @@ conda activate 06_image_translation
 
 Install vscode, install jupyter extension inside vscode, and setup [cell mode](https://code.visualstudio.com/docs/python/jupyter-support-py). Open [solution.py](solution.py) and run the script interactively.
 
-## Use Jupyter Notebook
+## Use Jupyter Notebook / Lab
 
 The matching exercise and solution notebooks can be found [here](https://github.com/dlmbl/image_translation/tree/28e0e515b4a8ad3f392a69c8341e105f730d204f) on the course repository.
 
-Launch a jupyter environment
+Launch a jupyter lab environment
 
 ```
 jupyter lab
