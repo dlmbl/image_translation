@@ -26,6 +26,8 @@ jobs:
 
           jupyter nbconvert solution.ipynb --ClearOutputPreprocessor.enabled=True --TagRemovePreprocessor.enabled=True --TagRemovePreprocessor.remove_cell_tags task --to notebook --output solution.ipynb
           jupyter nbconvert exercise.ipynb --ClearOutputPreprocessor.enabled=True --TagRemovePreprocessor.enabled=True --TagRemovePreprocessor.remove_cell_tags solution --to notebook --output exercise.ipynb
+          # Convert the cleaned-up exercise.ipynb back to a Python script
+          jupytext --to py:percent exercise.ipynb
 
       - uses: EndBug/add-and-commit@v9
         with:
