@@ -1,93 +1,81 @@
 # %% [markdown]
-"""
-# Image translation (Virtual Staining) - Part 1
+# # Image translation (Virtual Staining) - Part 1
 
-Written by Eduardo Hirata-Miyasaki, Ziwen Liu, and Shalin Mehta, CZ Biohub San Francisco.
+# Written by Eduardo Hirata-Miyasaki, Ziwen Liu, and Shalin Mehta, CZ Biohub San Francisco.
 
-## Overview
+# ## Overview
 
-In this exercise, we will predict fluorescence images of
-nuclei and plasma membrane markers from quantitative phase images of cells,
-i.e., we will _virtually stain_ the nuclei and plasma membrane
-visible in the phase image.
-This is an example of an image translation task.
-We will apply spatial and intensity augmentations to train robust models
-and evaluate their performance using a regression approach.
+# In this exercise, we will predict fluorescence images of
+# nuclei and plasma membrane markers from quantitative phase images of cells,
+# i.e., we will _virtually stain_ the nuclei and plasma membrane
+# visible in the phase image.
+# This is an example of an image translation task.
+# We will apply spatial and intensity augmentations to train robust models
+# and evaluate their performance using a regression approach.
 
-[![HEK293T](https://raw.githubusercontent.com/mehta-lab/VisCy/main/docs/figures/svideo_1.png)](https://github.com/mehta-lab/VisCy/assets/67518483/d53a81eb-eb37-44f3-b522-8bd7bddc7755)
-(Click on image to play video)
-"""
+# [![HEK293T](https://raw.githubusercontent.com/mehta-lab/VisCy/main/docs/figures/svideo_1.png)](https://github.com/mehta-lab/VisCy/assets/67518483/d53a81eb-eb37-44f3-b522-8bd7bddc7755)
+# (Click on image to play video)
 
 # %% [markdown]
-"""
-### Goals
+# ### Goals
 
-#### Part 1: Learn to use iohub (I/O library), VisCy dataloaders, and TensorBoard.
+# #### Part 1: Learn to use iohub (I/O library), VisCy dataloaders, and TensorBoard.
 
-  - Use a OME-Zarr dataset of 34 FOVs of adenocarcinomic human alveolar basal epithelial cells (A549),
-  each FOV has 3 channels (phase, nuclei, and cell membrane).
-  The nuclei were stained with DAPI and the cell membrane with Cellmask.
-  - Explore OME-Zarr using [iohub](https://czbiohub-sf.github.io/iohub/main/index.html)
-  and the high-content-screen (HCS) format.
-  - Use [MONAI](https://monai.io/) to implement data augmentations.
+#   - Use a OME-Zarr dataset of 34 FOVs of adenocarcinomic human alveolar basal epithelial cells (A549),
+#   each FOV has 3 channels (phase, nuclei, and cell membrane).
+#   The nuclei were stained with DAPI and the cell membrane with Cellmask.
+#   - Explore OME-Zarr using [iohub](https://czbiohub-sf.github.io/iohub/main/index.html)
+#   and the high-content-screen (HCS) format.
+#   - Use [MONAI](https://monai.io/) to implement data augmentations.
 
-#### Part 2: Train and evaluate the model to translate phase into fluorescence.
-  - Train a 2D UNeXt2 model to predict nuclei and membrane from phase images.
-  - Compare the performance of the trained model and a pre-trained model.
-  - Evaluate the model using pixel-level and instance-level metrics.
+# #### Part 2: Train and evaluate the model to translate phase into fluorescence.
+#   - Train a 2D UNeXt2 model to predict nuclei and membrane from phase images.
+#   - Compare the performance of the trained model and a pre-trained model.
+#   - Evaluate the model using pixel-level and instance-level metrics.
 
 
-Checkout [VisCy](https://github.com/mehta-lab/VisCy/tree/main/examples/demos),
-our deep learning pipeline for training and deploying computer vision models
-for image-based phenotyping including the robust virtual staining of landmark organelles.
-VisCy exploits recent advances in data and metadata formats
-([OME-zarr](https://www.nature.com/articles/s41592-021-01326-w)) and DL frameworks,
-[PyTorch Lightning](https://lightning.ai/) and [MONAI](https://monai.io/).
+# Checkout [VisCy](https://github.com/mehta-lab/VisCy/tree/main/examples/demos),
+# our deep learning pipeline for training and deploying computer vision models
+# for image-based phenotyping including the robust virtual staining of landmark organelles.
+# VisCy exploits recent advances in data and metadata formats
+# ([OME-zarr](https://www.nature.com/articles/s41592-021-01326-w)) and DL frameworks,
+# [PyTorch Lightning](https://lightning.ai/) and [MONAI](https://monai.io/).
 
-### References
+# ### References
 
-- [Liu, Z. and Hirata-Miyasaki, E. et al. (2024) Robust Virtual Staining of Cellular Landmarks](https://www.biorxiv.org/content/10.1101/2024.05.31.596901v2.full.pdf)
-- [Guo et al. (2020) Revealing architectural order with quantitative label-free imaging and deep learning. eLife](https://elifesciences.org/articles/55502)
-"""
+# - [Liu, Z. and Hirata-Miyasaki, E. et al. (2024) Robust Virtual Staining of Cellular Landmarks](https://www.biorxiv.org/content/10.1101/2024.05.31.596901v2.full.pdf)
+# - [Guo et al. (2020) Revealing architectural order with quantitative label-free imaging and deep learning. eLife](https://elifesciences.org/articles/55502)
 
 
 # %% [markdown]
-"""
-📖 As you work through parts 2, please share the layouts of your models (output of torchview)
-and their performance with everyone via
-[this Google Doc](https://docs.google.com/document/d/1Mq-yV8FTG02xE46Mii2vzPJVYSRNdeOXkeU-EKu-irE/edit?usp=sharing). 📖
-"""
+# 📖 As you work through parts 2, please share the layouts of your models (output of torchview)
+# and their performance with everyone via
+# [this Google Doc](https://docs.google.com/document/d/1Mq-yV8FTG02xE46Mii2vzPJVYSRNdeOXkeU-EKu-irE/edit?usp=sharing). 📖
 # %% [markdown]
-"""
-<div class="alert alert-info">
-The exercise is organized in 2 parts 
+# <div class="alert alert-info">
+# The exercise is organized in 2 parts
 
-<ul>
-<li><b>Part 1</b> - Learn to use iohub (I/O library), VisCy dataloaders, and tensorboard.</li>
-<li><b>Part 2</b> - Train and evaluate the model to translate phase into fluorescence.</li>
-</ul>
+# <ul>
+# <li><b>Part 1</b> - Learn to use iohub (I/O library), VisCy dataloaders, and tensorboard.</li>
+# <li><b>Part 2</b> - Train and evaluate the model to translate phase into fluorescence.</li>
+# </ul>
 
-</div>
-"""
+# </div>
 
 # %% [markdown]
-"""
-<div class="alert alert-danger">
-Set your python kernel to <span style="color:black;">06_image_translation</span>
-</div>
-"""
+# <div class="alert alert-danger">
+# Set your python kernel to <span style="color:black;">06_image_translation</span>
+# </div>
 # %% [markdown]
-"""
-## Part 1: Log training data to tensorboard, start training a model.
----------
-Learning goals:
+# ## Part 1: Log training data to tensorboard, start training a model.
+# ---------
+# Learning goals:
 
-- Load the OME-zarr dataset and examine the channels (A549).
-- Configure and understand the data loader.
-- Log some patches to tensorboard.
-- Initialize a 2D UNeXt2 model for virtual staining of nuclei and membrane from phase.
-- Start training the model to predict nuclei and membrane from phase.
-"""
+# - Load the OME-zarr dataset and examine the channels (A549).
+# - Configure and understand the data loader.
+# - Log some patches to tensorboard.
+# - Initialize a 2D UNeXt2 model for virtual staining of nuclei and membrane from phase.
+# - Start training the model to predict nuclei and membrane from phase.
 
 # %% Imports
 import os
@@ -150,14 +138,12 @@ if not data_path.exists():
 log_dir.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown] tags=[]
-"""
-The next cell starts tensorboard.
+# The next cell starts tensorboard.
 
-<div class="alert alert-warning">
-If you launched jupyter lab from ssh terminal, add <code>--host &lt;your-server-name&gt;</code> to the tensorboard command below. <code>&lt;your-server-name&gt;</code> is the address of your compute node that ends in amazonaws.com.
+# <div class="alert alert-warning">
+# If you launched jupyter lab from ssh terminal, add <code>--host &lt;your-server-name&gt;</code> to the tensorboard command below. <code>&lt;your-server-name&gt;</code> is the address of your compute node that ends in amazonaws.com.
 
-</div>
-"""
+# </div>
 
 # %% Imports and paths tags=[]
 
