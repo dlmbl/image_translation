@@ -37,12 +37,12 @@ mv ~/data/06_image_translation/part2/model_tensorboard/dlmbl_vscyto/dlmbl_vscyto
 cd ~/data/06_image_translation/part2/GAN_code/GANs_MI2I
 echo "Curent Directory: $(pwd)"
 
-# Dels
-fine and create the output directory
+# Define and create the output directory
 output_dir=~/data/06_image_translation/part2/tiff_files
 mkdir -p "$output_dir"
 echo "Output directory created at: $output_dir"
-$ENV_PATH/bin/python download_and_split_dataset.py --output_image_folder "$output_dir" --crop_size 512
+conda activate 06_image_translation
+python download_and_split_dataset.py --output_image_folder "$output_dir" --crop_size 512
 echo "Dataset downloaded and split."
 
 # Return to the starting directory
