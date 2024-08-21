@@ -45,7 +45,8 @@ Make sure that you are inside of the `image_translation` folder by using the `cd
 
 Run the setup script to create the environment for this exercise and download the dataset.
 ```bash
-sh setup.sh
+sh setup_student.sh
+
 ```
 Activate your environment
 ```bash

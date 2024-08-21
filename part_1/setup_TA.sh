@@ -17,9 +17,12 @@ $ENV_PATH/bin/pip install "viscy[metrics,visual]==0.2.0rc1"
 $ENV_PATH/bin/pip install "jupyterlab"
 
 # Create the directory structure
-mkdir -p ~/data/06_image_translation/part1/training
-mkdir -p ~/data/06_image_translation/part1/test
-mkdir -p ~/data/06_image_translation/part1/pretrained_models
+output_dir=/mnt/efs/dlmbl
+mkdir -p "$output_dir"/data/06_image_translation/part1/training
+mkdir -p "$output_dir"/data/06_image_translation/part1/test
+mkdir -p "$output_dir"/data/06_image_translation/part1/pretrained_models
+ln -s "$output_dir"/data ~/data
+
 # Change to the target directory
 cd ~/data/06_image_translation/part1/training
 # Download the OME-Zarr dataset recursively
