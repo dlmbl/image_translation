@@ -186,7 +186,7 @@ opt.ndf = 32  # Number of filters in the discriminator.
 opt.gpu_ids = [0] # GPU ids to use.
 opt.norm = "instance"  # Normalization layer in the generator.
 opt.use_dropout = ""  # Use dropout in the generator (fixed at 0.2).
-opt.batchSize = 8  # Batch size.
+opt.batchSize = 16  # Batch size.
 
 # Create a visualizer to perform image processing and visualization
 visualizer = Visualizer(opt)
@@ -510,8 +510,8 @@ def visualise_results(phase_images, target_stains, virtual_stains, crop_size=Non
         axes[index, 2].imshow(
             virtual_stain,
             cmap="gray",
-            vmin=np.percentile(target_stain, 1),
-            vmax=np.percentile(target_stain, 99),
+            vmin=np.percentile(virtual_stain, 1),
+            vmax=np.percentile(virtual_stain, 99),
         )
         axes[index, 2].set_title("Virtual Stain")
     for ax in axes.flatten():
@@ -520,6 +520,7 @@ def visualise_results(phase_images, target_stains, virtual_stains, crop_size=Non
     plt.show()
 
 visualise_results(phase_images, target_stains,virtual_stains,crop_size=None)
+
 # %% [markdown] tags=[]
 """
 <div class="alert alert-info">
@@ -635,8 +636,8 @@ test_segmentation_metrics= pd.DataFrame(
 # Define tuple to store the segmentation results. Each value in the tuple is a dictionary containing the model name, fov, predicted label, predicted stain, target label, and target stain.
 segmentation_results = ()
 
-for i, (target_stain, predicted_stain) in tqdm(enumerate(zip(target_stains, virtual_stains))):
-    fov = str(virtual_stain_paths)[i].spilt("/")[-1].split(".")[0]
+for i, (target_stain, predicted_stain) in tqdm(enumerate(zip(target_stains, virtual_stains)),desc='Computing Metrics',total=len(target_stains)):
+    fov = str(virtual_stain_paths[i]).split("/")[-1].split(".")[0]
     minmax_norm_target = min_max_scale(target_stain)
     minmax_norm_predicted = min_max_scale(predicted_stain)
     # Compute the segmentation masks.
