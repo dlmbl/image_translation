@@ -44,7 +44,7 @@ echo "Output directory created at: $output_dir"
 conda activate 06_image_translation
 python download_and_split_dataset.py --output_image_folder "$output_dir" --crop_size 512
 echo "Dataset downloaded and split."
-
+conda deactivate
 # Return to the starting directory
 cd "$START_DIR"
 echo "Returned to the starting directory: $START_DIR"
