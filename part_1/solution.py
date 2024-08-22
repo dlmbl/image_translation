@@ -1,93 +1,81 @@
+# %% [markdown] tags=[]
+# # Image translation (Virtual Staining) - Part 1
+
+# Written by Eduardo Hirata-Miyasaki, Ziwen Liu, and Shalin Mehta, CZ Biohub San Francisco
+
+# ## Overview
+
+# In this exercise, we will predict fluorescence images of
+# nuclei and plasma membrane markers from quantitative phase images of cells,
+# i.e., we will _virtually stain_ the nuclei and plasma membrane
+# visible in the phase image.
+# This is an example of an image translation task.
+# We will apply spatial and intensity augmentations to train robust models
+# and evaluate their performance using a regression approach.
+
+# [![HEK293T](https://raw.githubusercontent.com/mehta-lab/VisCy/main/docs/figures/svideo_1.png)](https://github.com/mehta-lab/VisCy/assets/67518483/d53a81eb-eb37-44f3-b522-8bd7bddc7755)
+# (Click on image to play video)
+
+# %% [markdown] tags=[]
+# ### Goals
+
+# #### Part 1: Learn to use iohub (I/O library), VisCy dataloaders, and TensorBoard.
+
+#   - Use a OME-Zarr dataset of 34 FOVs of adenocarcinomic human alveolar basal epithelial cells (A549),
+#   each FOV has 3 channels (phase, nuclei, and cell membrane).
+#   The nuclei were stained with DAPI and the cell membrane with Cellmask.
+#   - Explore OME-Zarr using [iohub](https://czbiohub-sf.github.io/iohub/main/index.html)
+#   and the high-content-screen (HCS) format.
+#   - Use [MONAI](https://monai.io/) to implement data augmentations.
+
+# #### Part 2: Train and evaluate the model to translate phase into fluorescence.
+#   - Train a 2D UNeXt2 model to predict nuclei and membrane from phase images.
+#   - Compare the performance of the trained model and a pre-trained model.
+#   - Evaluate the model using pixel-level and instance-level metrics.
+
+
+# Checkout [VisCy](https://github.com/mehta-lab/VisCy/tree/main/examples/demos),
+# our deep learning pipeline for training and deploying computer vision models
+# for image-based phenotyping including the robust virtual staining of landmark organelles.
+# VisCy exploits recent advances in data and metadata formats
+# ([OME-zarr](https://www.nature.com/articles/s41592-021-01326-w)) and DL frameworks,
+# [PyTorch Lightning](https://lightning.ai/) and [MONAI](https://monai.io/).
+
+# ### References
+
+# - [Liu, Z. and Hirata-Miyasaki, E. et al. (2024) Robust Virtual Staining of Cellular Landmarks](https://www.biorxiv.org/content/10.1101/2024.05.31.596901v2.full.pdf)
+# - [Guo et al. (2020) Revealing architectural order with quantitative label-free imaging and deep learning. eLife](https://elifesciences.org/articles/55502)
+
+
+# %% [markdown] tags=[]
+# 📖 As you work through parts 2, please share the layouts of your models (output of torchview)
+# and their performance with everyone via
+# [this Google Doc](https://docs.google.com/document/d/1Mq-yV8FTG02xE46Mii2vzPJVYSRNdeOXkeU-EKu-irE/edit?usp=sharing). 📖
+# %% [markdown] tags=[]
+# <div class="alert alert-info">
+# The exercise is organized in 2 parts
+
+# <ul>
+# <li><b>Part 1</b> - Learn to use iohub (I/O library), VisCy dataloaders, and tensorboard.</li>
+# <li><b>Part 2</b> - Train and evaluate the model to translate phase into fluorescence.</li>
+# </ul>
+
+# </div>
+
+# %% [markdown] tags=[]
+# <div class="alert alert-danger">
+# Set your python kernel to <span style="color:black;">06_image_translation</span>
+# </div>
 # %% [markdown]
-"""
-# Image translation (Virtual Staining) - Part 1
+# ## Part 1: Log training data to tensorboard, start training a model.
+# ---------
+# Learning goals:
 
-Written by Eduardo Hirata-Miyasaki, Ziwen Liu, and Shalin Mehta, CZ Biohub San Francisco.
-
-## Overview
-
-In this exercise, we will predict fluorescence images of
-nuclei and plasma membrane markers from quantitative phase images of cells,
-i.e., we will _virtually stain_ the nuclei and plasma membrane
-visible in the phase image.
-This is an example of an image translation task.
-We will apply spatial and intensity augmentations to train robust models
-and evaluate their performance using a regression approach.
-
-[![HEK293T](https://raw.githubusercontent.com/mehta-lab/VisCy/main/docs/figures/svideo_1.png)](https://github.com/mehta-lab/VisCy/assets/67518483/d53a81eb-eb37-44f3-b522-8bd7bddc7755)
-(Click on image to play video)
-"""
-
-# %% [markdown]
-"""
-### Goals
-
-#### Part 1: Learn to use iohub (I/O library), VisCy dataloaders, and TensorBoard.
-
-  - Use a OME-Zarr dataset of 34 FOVs of adenocarcinomic human alveolar basal epithelial cells (A549),
-  each FOV has 3 channels (phase, nuclei, and cell membrane).
-  The nuclei were stained with DAPI and the cell membrane with Cellmask.
-  - Explore OME-Zarr using [iohub](https://czbiohub-sf.github.io/iohub/main/index.html)
-  and the high-content-screen (HCS) format.
-  - Use [MONAI](https://monai.io/) to implement data augmentations.
-
-#### Part 2: Train and evaluate the model to translate phase into fluorescence.
-  - Train a 2D UNeXt2 model to predict nuclei and membrane from phase images.
-  - Compare the performance of the trained model and a pre-trained model.
-  - Evaluate the model using pixel-level and instance-level metrics.
-
-
-Checkout [VisCy](https://github.com/mehta-lab/VisCy/tree/main/examples/demos),
-our deep learning pipeline for training and deploying computer vision models
-for image-based phenotyping including the robust virtual staining of landmark organelles.
-VisCy exploits recent advances in data and metadata formats
-([OME-zarr](https://www.nature.com/articles/s41592-021-01326-w)) and DL frameworks,
-[PyTorch Lightning](https://lightning.ai/) and [MONAI](https://monai.io/).
-
-### References
-
-- [Liu, Z. and Hirata-Miyasaki, E. et al. (2024) Robust Virtual Staining of Cellular Landmarks](https://www.biorxiv.org/content/10.1101/2024.05.31.596901v2.full.pdf)
-- [Guo et al. (2020) Revealing architectural order with quantitative label-free imaging and deep learning. eLife](https://elifesciences.org/articles/55502)
-"""
-
-
-# %% [markdown]
-"""
-📖 As you work through parts 2, please share the layouts of your models (output of torchview)
-and their performance with everyone via
-[this Google Doc](https://docs.google.com/document/d/1Mq-yV8FTG02xE46Mii2vzPJVYSRNdeOXkeU-EKu-irE/edit?usp=sharing). 📖
-"""
-# %% [markdown]
-"""
-<div class="alert alert-info">
-The exercise is organized in 2 parts 
-
-<ul>
-<li><b>Part 1</b> - Learn to use iohub (I/O library), VisCy dataloaders, and tensorboard.</li>
-<li><b>Part 2</b> - Train and evaluate the model to translate phase into fluorescence.</li>
-</ul>
-
-</div>
-"""
-
-# %% [markdown]
-"""
-<div class="alert alert-danger">
-Set your python kernel to <span style="color:black;">06_image_translation</span>
-</div>
-"""
-# %% [markdown]
-"""
-## Part 1: Log training data to tensorboard, start training a model.
----------
-Learning goals:
-
-- Load the OME-zarr dataset and examine the channels (A549).
-- Configure and understand the data loader.
-- Log some patches to tensorboard.
-- Initialize a 2D UNeXt2 model for virtual staining of nuclei and membrane from phase.
-- Start training the model to predict nuclei and membrane from phase.
-"""
+# - Load the OME-zarr dataset and examine the channels (A549).
+# - Configure and understand the data loader.
+# - Log some patches to tensorboard.
+# - Initialize a 2D UNeXt2 model for virtual staining of nuclei and membrane from phase.
+# - Start training the model to predict nuclei and membrane from phase.
 
 # %% Imports
 import os
@@ -132,8 +120,8 @@ seed_everything(42, workers=True)
 
 # Paths to data and log directory
 top_dir = Path(
-    "~/data"
-).expanduser() # TODO: Change this to point to your data directory.
+    f"/{os.environ['HOME']}/data/"
+)  # If this fails, make sure this to point to your data directory.
 
 data_path = (
     top_dir / "06_image_translation/part1/training/a549_hoechst_cellmask_train_val.zarr"
@@ -150,25 +138,12 @@ if not data_path.exists():
 log_dir.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown] tags=[]
-"""
-The next cell starts tensorboard.
+# The next cell starts tensorboard.
 
-<div class="alert alert-warning">
-If you launched jupyter lab from ssh terminal, add <code>--host &lt;your-server-name&gt;</code> to the tensorboard command below. <code>&lt;your-server-name&gt;</code> is the address of your compute node that ends in amazonaws.com.
+# <div class="alert alert-warning">
+# If you launched jupyter lab from ssh terminal, add <code>--host &lt;your-server-name&gt;</code> to the tensorboard command below. <code>&lt;your-server-name&gt;</code> is the address of your compute node that ends in amazonaws.com.
 
-</div>
-
-<div class="alert alert-warning">
-If you are using VSCode and a remote server, you will need to forward the port to view the tensorboard. <br>
-Take note of the port number was assigned in the previous cell.(i.e <code> http://localhost:{port_number_assigned}</code>) <br>
-
-Locate the your VSCode terminal and select the <code>Ports</code> tab <br>
-<ul>
-<li>Add a new port with the <code>port_number_assigned</code>
-</ul>
-Click on the link to view the tensorboard and it should open in your browser.
-</div>
-"""
+# </div>
 
 # %% Imports and paths tags=[]
 
@@ -198,33 +173,41 @@ def launch_tensorboard(log_dir):
 
 # Launch tensorboard and click on the link to view the logs.
 tensorboard_process = launch_tensorboard(log_dir)
+# %% [markdown] tags = []
+# <div class="alert alert-warning">
+# If you are using VSCode and a remote server, you will need to forward the port to view the tensorboard. <br>
+# Take note of the port number was assigned in the previous cell.(i.e <code> http://localhost:{port_number_assigned}</code>) <br>
 
-# %% [markdown]
-"""
-## Load OME-Zarr Dataset
+# Locate the your VSCode terminal and select the <code>Ports</code> tab <br>
+# <ul>
+# <li>Add a new port with the <code>port_number_assigned</code>
+# </ul>
+# Click on the link to view the tensorboard and it should open in your browser.
+# </div>
 
-There should be 34 FOVs in the dataset.
 
-Each FOV consists of 3 channels of 2048x2048 images,
-saved in the [High-Content Screening (HCS) layout](https://ngff.openmicroscopy.org/latest/#hcs-layout)
-specified by the Open Microscopy Environment Next Generation File Format
-(OME-NGFF).
+# %% [markdown] tags=[]
+# ## Load OME-Zarr Dataset
 
-- The layout on the disk is: `row/col/field/pyramid_level/timepoint/channel/z/y/x.`
-- These datasets only have 1 level in the pyramid (highest resolution) which is '0'.
-"""
+# There should be 34 FOVs in the dataset.
 
-# %% [markdown]
-"""
-<div class="alert alert-warning">
-You can inspect the tree structure by using your terminal:
-<code> iohub info -v "path-to-ome-zarr" </code>
+# Each FOV consists of 3 channels of 2048x2048 images,
+# saved in the [High-Content Screening (HCS) layout](https://ngff.openmicroscopy.org/latest/#hcs-layout)
+# specified by the Open Microscopy Environment Next Generation File Format
+# (OME-NGFF).
 
-<br>
-More info on the CLI:
-<code>iohub info --help </code> to see the help menu.
-</div>
-"""
+# - The layout on the disk is: `row/col/field/pyramid_level/timepoint/channel/z/y/x.`
+# - These datasets only have 1 level in the pyramid (highest resolution) which is '0'.
+
+# %% [markdown] tags=[]
+# <div class="alert alert-warning">
+# You can inspect the tree structure by using your terminal:
+# <code> iohub info -v "path-to-ome-zarr" </code>
+
+# <br>
+# More info on the CLI:
+# <code>iohub info --help </code> to see the help menu.
+# </div>
 # %%
 # This is the python function called by `iohub info` CLI command
 print_info(data_path, verbose=True)
@@ -232,7 +215,7 @@ print_info(data_path, verbose=True)
 # Open and inspect the dataset.
 dataset = open_ome_zarr(data_path)
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-info">
 #
 # ### Task 1.1
@@ -240,7 +223,7 @@ dataset = open_ome_zarr(data_path)
 # Check the cell density, the cell morphologies, and fluorescence signal.
 # HINT: look at the HCS Plate format to see what are your options.
 # </div>
-# %%
+# %%tags=["task"]
 # Use the field and pyramid_level below to visualize data.
 row = 0
 col = 0
@@ -268,19 +251,17 @@ for i in range(n_channels):
         axes[i].set_title(dataset.channel_names[i])
 plt.tight_layout()
 
-# %% [markdown]
-"""
-## Explore the effects of augmentation on batch.
+# %% [markdown] tags=[]
+# ## Explore the effects of augmentation on batch.
 
-VisCy builds on top of PyTorch Lightning. PyTorch Lightning is a thin wrapper around PyTorch that allows rapid experimentation. It provides a [DataModule](https://lightning.ai/docs/pytorch/stable/data/datamodule.html) to handle loading and processing of data during training. VisCy provides a child class, `HCSDataModule` to make it intuitve to access data stored in the HCS layout.
-  
-The dataloader in `HCSDataModule` returns a batch of samples. A `batch` is a list of dictionaries. The length of the list is equal to the batch size. Each dictionary consists of following key-value pairs.
-- `source`: the input image, a tensor of size 1*1*Y*X
-- `target`: the target image, a tensor of size 2*1*Y*X
-- `index` : the tuple of (location of field in HCS layout, time, and z-slice) of the sample.
-"""
+# VisCy builds on top of PyTorch Lightning. PyTorch Lightning is a thin wrapper around PyTorch that allows rapid experimentation. It provides a [DataModule](https://lightning.ai/docs/pytorch/stable/data/datamodule.html) to handle loading and processing of data during training. VisCy provides a child class, `HCSDataModule` to make it intuitve to access data stored in the HCS layout.
 
-# %% [markdown]
+# The dataloader in `HCSDataModule` returns a batch of samples. A `batch` is a list of dictionaries. The length of the list is equal to the batch size. Each dictionary consists of following key-value pairs.
+# - `source`: the input image, a tensor of size 1*1*Y*X
+# - `target`: the target image, a tensor of size 2*1*Y*X
+# - `index` : the tuple of (location of field in HCS layout, time, and z-slice) of the sample.
+
+# %% [markdown] tags=[]
 # <div class="alert alert-info">
 #
 # ### Task 1.2
@@ -382,7 +363,7 @@ def log_batch_jupyter(batch):
     plt.show()
 
 
-# %%
+# %% tags=["task"]
 # Initialize the data module.
 
 BATCH_SIZE = 4
@@ -474,7 +455,7 @@ writer = SummaryWriter(log_dir=f"{log_dir}/view_batch")
 batch = next(iter(train_dataloader))
 log_batch_tensorboard(batch, 0, writer, "augmentation/none")
 writer.close()
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-warning">
 # 
 # ### Questions
@@ -484,13 +465,13 @@ writer.close()
 # Note: If tensorboard is not showing images, try refreshing and using the "Images" tab.
 # </div>
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # If your tensorboard is causing issues, you can visualize directly on Jupyter /VSCode
 # %%
 # Visualize in Jupyter
 log_batch_jupyter(batch)
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-warning">
 # <h3> Question for Task 1.3 </h3>
 # 1. How do they make the model more robust to imaging parameters or conditions
@@ -510,8 +491,7 @@ log_batch_jupyter(batch)
 # *Note these are MONAI transforms that have been redefined for VisCy.* 
 # [Compare your choice of augmentations by dowloading the pretrained models and config files](https://github.com/mehta-lab/VisCy/releases/download/v0.1.0/VisCy-0.1.0-VS-models.zip).
 # </div>
-
-# %%
+# %% tags=["task"]
 # Here we turn on data augmentation and rerun setup
 # #######################
 # ##### TODO ########
@@ -623,7 +603,7 @@ augmented_batch = next(iter(augmented_train_dataloader))
 log_batch_tensorboard(augmented_batch, 0, writer, "augmentation/some")
 writer.close()
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-warning">
 # <h3> Question for Task 1.3 </h3>
 # 1. Look at your tensorboard. Can you tell the agumentations were applied to the sample batch? Compare the batch with and without augmentations. <br>
@@ -636,12 +616,10 @@ writer.close()
 # %%
 log_batch_jupyter(augmented_batch)
 
-# %% [markdown]
-"""
-## Train a 2D U-Net model to predict nuclei and membrane from phase.
+# %% [markdown] tags=[]
+# ## Train a 2D U-Net model to predict nuclei and membrane from phase.
 
 ### Constructing a 2D UNeXt2 using VisCy
-"""
 # %% [markdown]
 # <div class="alert alert-info">
 #
@@ -656,8 +634,9 @@ log_batch_jupyter(augmented_batch)
 # <b> Note </b> <br>
 # See ``viscy.unet.networks.Unet2D.Unet2d`` ([source code](https://github.com/mehta-lab/VisCy/blob/7c5e4c1d68e70163cf514d22c475da8ea7dc3a88/viscy/unet/networks/Unet2D.py#L7)) to learn more about the configuration.
 # </div>
-#%% 
-# Here we are creating a 2D UNet.
+
+# %% tags=["task"]
+# Create a 2D UNet.
 GPU_ID = 0
 
 BATCH_SIZE = 12
@@ -753,6 +732,9 @@ phase2fluor_model = VSUNet(
     freeze_encoder=False,
 )
 
+# %% [markdown] tags=[]
+# ### Instantiate data module and trainer, test that we are setup to launch training.
+# %%
 source_channel = ["Phase3D"]
 target_channel = ["Nucl", "Mem"]
 # Setup the data module.
@@ -777,7 +759,7 @@ trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID], fast_dev_run=True)
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ## View model graph.
 #
 # PyTorch uses dynamic graphs under the hood.
@@ -810,7 +792,7 @@ model_graph_phase2fluor = torchview.draw_graph(
 # Print the image of the model.
 model_graph_phase2fluor.visual_graph
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-warning">
 #
 # ### Question:
@@ -818,13 +800,11 @@ model_graph_phase2fluor.visual_graph
 # </div>
 
 # %% [markdown]
-"""
-<div class="alert alert-info">
+# <div class="alert alert-info">
 
-<h3> Task 1.6 </h3>
-Start training by running the following cell. Check the new logs on the tensorboard.
-</div>
-"""
+# <h3> Task 1.6 </h3>
+# Start training by running the following cell. Check the new logs on the tensorboard.
+# </div>
 
 # %%
 # Check if GPU is available
@@ -851,51 +831,44 @@ trainer = VSTrainer(
 # Launch training and check that loss and images are being logged on tensorboard.
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 
-# %% [markdown]
-"""
-<div class="alert alert-success">
+# %% [markdown] tags=[]
+# <div class="alert alert-success">
 
-<h2> Checkpoint 1 </h2>
+# <h2> Checkpoint 1 </h2>
 
-While your model is training, let's think about the following questions:<br>
-<ul>
-<li>What is the information content of each channel in the dataset?</li>
-<li>How would you use image translation models?</li>
-<li>What can you try to improve the performance of each model?</li>
-</ul>
+# While your model is training, let's think about the following questions:<br>
+# <ul>
+# <li>What is the information content of each channel in the dataset?</li>
+# <li>How would you use image translation models?</li>
+# <li>What can you try to improve the performance of each model?</li>
+# </ul>
 
-Now the training has started,
-we can come back after a while and evaluate the performance!
+# Now the training has started,
+# we can come back after a while and evaluate the performance!
 
-</div>
-"""
+# </div>
+# %% [markdown] tags=[]
+# ## Part 2: Assess your trained model
 
-# %% [markdown]
-"""
-## Part 2: Assess your trained model
+# Now we will look at some metrics of performance of previous model.
+# We typically evaluate the model performance on a held out test data.
+# We will use the following metrics to evaluate the accuracy of regression of the model:
 
-Now we will look at some metrics of performance of previous model.
-We typically evaluate the model performance on a held out test data.
-We will use the following metrics to evaluate the accuracy of regression of the model:
+# - [Person Correlation](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient).
+# - [Structural similarity](https://en.wikipedia.org/wiki/Structural_similarity) (SSIM).
 
-- [Person Correlation](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient).
-- [Structural similarity](https://en.wikipedia.org/wiki/Structural_similarity) (SSIM).
-
-You should also look at the validation samples on tensorboard
-(hint: the experimental data in nuclei channel is imperfect.)
-"""
+# You should also look at the validation samples on tensorboard
+# (hint: the experimental data in nuclei channel is imperfect.)
 
 # %% [markdown]
-"""
-<div class="alert alert-info">
+# <div class="alert alert-info">
 
-<h3> Task 2.1 Define metrics </h3>
+# <h3> Task 2.1 Define metrics </h3>
 
-For each of the above metrics, write a brief definition of what they are and what they mean
-for this image translation task. Use your favorite search engine and/or resources.
+# For each of the above metrics, write a brief definition of what they are and what they mean
+# for this image translation task. Use your favorite search engine and/or resources.
 
-</div>
-"""
+# </div>
 
 # %% [markdown]
 # ```
@@ -910,9 +883,7 @@ for this image translation task. Use your favorite search engine and/or resource
 # - Structural similarity:
 
 # %% [markdown]
-"""
-Let's compute metrics directly and plot below.
-"""
+# Let's compute metrics directly and plot below.
 # %%
 # Setup the test data module.
 test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
@@ -934,7 +905,7 @@ test_metrics = pd.DataFrame(
     columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
 )
 
-# %% 
+# %%
 # Compute metrics directly and plot here.
 def min_max_scale(input):
     return (input - np.min(input)) / (np.max(input) - np.min(input))
@@ -1024,30 +995,28 @@ for i, sample in enumerate(test_data.test_dataloader()):
     break
 
 # %% [markdown] tags=[]
-"""
-<div class="alert alert-info">
+# <div class="alert alert-info">
 
-<h3> Task 2.2 Compute the metrics with respect to the pretrained model VSCyto2D </h3>
-Here we will compare your model with the VSCyto2D pretrained model by computing the pixel-based metrics and segmentation-based metrics.
- 
-<ul>
-<li>When you ran the `setup.sh` you also downloaded the models in `/06_image_translation/part1/pretrained_models/VSCyto2D/*.ckpt`</li>
-<li>Load the <b>VSCyto2 model</b> model checkpoint and the configuration file</li>
-<li>Compute the pixel-based metrics and segmentation-based metrics between the model you trained and the pretrained model</li>
-</ul>
-<br>
+# <h3> Task 2.2 Compute the metrics with respect to the pretrained model VSCyto2D </h3>
+# Here we will compare your model with the VSCyto2D pretrained model by computing the pixel-based metrics and segmentation-based metrics.
 
-We will evaluate the performance of your trained model with a pre-trained model using pixel based metrics as above and
-segmantation based metrics including (mAP@0.5, dice, accuracy and jaccard index).
-</div>
+# <ul>
+# <li>When you ran the `setup.sh` you also downloaded the models in `/06_image_translation/part1/pretrained_models/VSCyto2D/*.ckpt`</li>
+# <li>Load the <b>VSCyto2 model</b> model checkpoint and the configuration file</li>
+# <li>Compute the pixel-based metrics and segmentation-based metrics between the model you trained and the pretrained model</li>
+# </ul>
+# <br>
 
-"""
+# We will evaluate the performance of your trained model with a pre-trained model using pixel based metrics as above and
+# segmantation based metrics including (mAP@0.5, dice, accuracy and jaccard index).
+# </div>
 
-# %% tags=[]
+
+# %% tags=["task"]
 #################
 ##### TODO ######
 #################
-# Let's load the pretrained model checkpoint  
+# Let's load the pretrained model checkpoint
 pretrained_model_ckpt = top_dir/...## Add the path to the "VSCyto2D/epoch=399-step=23200.ckpt"
 
 # TODO: Load the phase2fluor_config just like the model you trained
@@ -1087,9 +1056,8 @@ pretrained_phase2fluor = VSUNet.load_from_checkpoint(
 )
 pretrained_phase2fluor.eval()
 
-### Re-load your trained model 
-#NOTE: assuming the latest checkpoint it your latest training and model
-#TODO: modify above is not the case
+### Re-load your trained model
+# NOTE: assuming the latest checkpoint it your latest training and model
 phase2fluor_model_ckpt = natsorted(glob(
     str(top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
 ))[-1]
@@ -1112,22 +1080,20 @@ phase2fluor_model = VSUNet.load_from_checkpoint(
 )
 phase2fluor_model.eval()
 
-#%%[markdown]
-"""
-### Let's compute the metrics for the test dataset
-Before you run the following code, make sure you have the pretrained model loaded and the test data is ready.
+# %% [markdown] tags=[]
+# ### Let's compute the metrics for the test dataset
+# Before you run the following code, make sure you have the pretrained model loaded and the test data is ready.
 
-The following code will compute the following:
-- the pixel-based metrics  (pearson correlation, SSIM)
-- segmentation-based metrics (mAP@0.5, dice, accuracy, jaccard index)
+# The following code will compute the following:
+# - the pixel-based metrics  (pearson correlation, SSIM)
+# - segmentation-based metrics (mAP@0.5, dice, accuracy, jaccard index)
 
-#### Note:
-- The segmentation-based metrics are computed using the cellpose stock `nuclei` model
-- The metrics will be store in the `test_pixel_metrics` and `test_segmentation_metrics` dataframes
-- The segmentations will be stored in the `segmentation_store` zarr file
-- Analyze the code while it runs.
-"""
-#%%
+# #### Note:
+# - The segmentation-based metrics are computed using the cellpose stock `nuclei` model
+# - The metrics will be store in the `test_pixel_metrics` and `test_segmentation_metrics` dataframes
+# - The segmentations will be stored in the `segmentation_store` zarr file
+# - Analyze the code while it runs.
+# %%
 # Define the function to compute the cellpose segmentation and the normalization
 def min_max_scale(input):
     return (input - np.min(input)) / (np.max(input) - np.min(input))
@@ -1153,7 +1119,7 @@ def cellpose_segmentation(prediction:ArrayLike,target:ArrayLike)->Tuple[torch.Sh
 
     return (pred_label,target_label)
 
-#%% 
+# %%
 # Setting the paths for the test data and the output segmentation
 test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
 output_segmentation_path=top_dir /"06_image_translation/part1/pretrained_model_segmentations.zarr"
@@ -1183,7 +1149,7 @@ nuc_cidx = channel_names.index("Nucl")
 mem_cidx =  channel_names.index("Mem")
 nuc_label_cidx =  channel_names.index("nuclei_segmentation")
 
-#%%
+# %%
 # Iterating through the test dataset positions to:
 positions = list(test_dataset.positions())
 total_positions = len(positions)
@@ -1340,31 +1306,29 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
 # Close the OME-Zarr files
 test_dataset.close()
 segmentation_store.close()
-#%%
-#Save the test metrics into a dataframe
+# %%
+# Save the test metrics into a dataframe
 pixel_metrics_path = top_dir/"06_image_translation/part1/VS_metrics_pixel_part_1.csv"
 segmentation_metrics_path = top_dir/"06_image_translation/part1/VS_metrics_segments_part_1.csv"
 test_pixel_metrics.to_csv(pixel_metrics_path)
 test_segmentation_metrics.to_csv(segmentation_metrics_path)
 
 # %% [markdown] tags=[]
-"""
-<div class="alert alert-info">
+# <div class="alert alert-info">
 
-<h3> Task 2.3 Compare the model's metrics </h3>
-In the previous section, we computed the pixel-based metrics and segmentation-based metrics.
-Now we will compare the performance of the model you trained with the pretrained model by plotting the boxplots.
+# <h3> Task 2.3 Compare the model's metrics </h3>
+# In the previous section, we computed the pixel-based metrics and segmentation-based metrics.
+# Now we will compare the performance of the model you trained with the pretrained model by plotting the boxplots.
 
-After you plot the metrics answer the following:
-<ul>
-<li>What do these metrics tells us about the performance of the model?</li>
-<li>How do you interpret the differences in the metrics between the models?</li>
-<li>How is your model compared to the pretrained model? How can you improve it?</li>
-</ul>
-</div>
+# After you plot the metrics answer the following:
+# <ul>
+# <li>What do these metrics tells us about the performance of the model?</li>
+# <li>How do you interpret the differences in the metrics between the models?</li>
+# <li>How is your model compared to the pretrained model? How can you improve it?</li>
+# </ul>
+# </div>
 
-"""
-#%%
+# %%
 # Show boxplot of the metrics
 # Boxplot of the metrics
 test_pixel_metrics.boxplot(
@@ -1386,23 +1350,18 @@ test_segmentation_metrics.boxplot(
 plt.suptitle("Model Segmentation Metrics")
 plt.show()
 
-#%%[markdown]
-"""
-########## TODO ##############
-- What do these metrics tells us about the performance of the model?
-- How do you interpret the differences in the metrics between the models?
-- How is your model compared to the pretrained model? How can you improve it?
+# %% [markdown] tags=["task"]
+# ########## TODO ##############
+# - What do these metrics tells us about the performance of the model?
+# - How do you interpret the differences in the metrics between the models?
+# - How is your model compared to the pretrained model? How can you improve it?
 
-"""
+# %% [markdown]
+# ## Plotting the predictions and segmentations
+# Here we will plot the predictions and segmentations side by side for the pretrained and trained models.
 
-#%%[markdown]
-"""
-## Plotting the predictions and segmentations
-Here we will plot the predictions and segmentations side by side for the pretrained and trained models.
-
-Please modify the crop size and Y,X slicing to view different areas of the FOV.
-"""
-#%%
+# Please modify the crop size and Y,X slicing to view different areas of the FOV.
+# %% tags=["task"]
 ######## TODO ##########
 # Modify the crop size and Y,X slicing to view different areas of the FOV
 crop = 256
@@ -1453,24 +1412,22 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown] tags=[]
-"""
-<div class="alert alert-success">
+# <div class="alert alert-success">
 
-<h2> 
-🎉 The end of the notebook 🎉 
-Continue to Part 2: Image translation with generative models.
-</h2>
+# <h2>
+# 🎉 The end of the notebook 🎉
+# Continue to Part 2: Image translation with generative models.
+# </h2>
 
-Congratulations! You have trained several image translation models now!
-<br>
-Please remember to document the hyperparameters,
-snapshots of predictions on validation set,
-and loss curves for your models and add the final performance in
-<a href="https://docs.google.com/document/d/1Mq-yV8FTG02xE46Mii2vzPJVYSRNdeOXkeU-EKu-irE/edit?usp=sharing">
-this google doc
-</a>.
-We'll discuss our combined results as a group.
-</div>
-"""
+# Congratulations! You have trained several image translation models now!
+# <br>
+# Please remember to document the hyperparameters,
+# snapshots of predictions on validation set,
+# and loss curves for your models and add the final performance in
+# <a href="https://docs.google.com/document/d/1Mq-yV8FTG02xE46Mii2vzPJVYSRNdeOXkeU-EKu-irE/edit?usp=sharing">
+# this google doc
+# </a>.
+# We'll discuss our combined results as a group.
+# </div>
 
 # %%
