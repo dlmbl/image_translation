@@ -132,8 +132,8 @@ seed_everything(42, workers=True)
 
 # Paths to data and log directory
 top_dir = Path(
-    f"/hpc/mydata/{os.environ['USER']}/data/"
-)  # TODO: Change this to point to your data directory.
+    "~/data"
+).expanduser() # TODO: Change this to point to your data directory.
 
 data_path = (
     top_dir / "06_image_translation/part1/training/a549_hoechst_cellmask_train_val.zarr"
@@ -232,12 +232,19 @@ print_info(data_path, verbose=True)
 # Open and inspect the dataset.
 dataset = open_ome_zarr(data_path)
 
+# %% [markdown]
+# <div class="alert alert-info">
+#
+# ### Task 1.1
+# Look at a couple different fields of view (FOVs) by changing the `field` variable.
+# Check the cell density, the cell morphologies, and fluorescence signal.
+# HINT: look at the HCS Plate format to see what are your options.
+# </div>
 # %%
 # Use the field and pyramid_level below to visualize data.
 row = 0
 col = 0
 field = 9  # TODO: Change this to explore data.
-
 
 # NOTE: this dataset only has one level
 pyaramid_level = 0
@@ -262,15 +269,6 @@ for i in range(n_channels):
 plt.tight_layout()
 
 # %% [markdown]
-# <div class="alert alert-info">
-#
-# ### Task 1.1
-#
-# Look at a couple different fields of view by changing the value in the cell above.
-# Check the cell density, the cell morphologies, and fluorescence signal.
-# </div>
-
-# %% [markdown]
 """
 ## Explore the effects of augmentation on batch.
 
@@ -286,18 +284,18 @@ The dataloader in `HCSDataModule` returns a batch of samples. A `batch` is a lis
 # <div class="alert alert-info">
 #
 # ### Task 1.2
+# - Run the next cell to setup a logger for your augmentations.
+# - Setup the `HCSDataloader()` in for training.
+#   - Configure the dataloader for the `"UNeXt2_2D"`
+#   - Configure the dataloader for the phase (source) to fluorescence cell nuclei and membrane (targets) regression task.
+#   - Configure the dataloader for training. Hint: use the `HCSDataloader.setup()`
+# - Open your tensorboard and look at the `IMAGES tab`.
 #
-# Setup the data loader and log several batches to tensorboard.
-#
-# Based on the tensorboard images, what are the two channels in the target image?
-#
-# Note: If tensorboard is not showing images, try refreshing and using the "Images" tab.
+# Note: If tensorboard is not showing images or the plots, try refreshing and using the "Images" tab.
 # </div>
 
 # %%
 # Define a function to write a batch to tensorboard log.
-
-
 def log_batch_tensorboard(batch, batchno, writer, card_name):
     """
     Logs a batch of images to TensorBoard.
@@ -338,8 +336,6 @@ def log_batch_tensorboard(batch, batchno, writer, card_name):
     # add the grid to tensorboard
     writer.add_image(card_name, grid, batchno)
 
-
-# %%
 # Define a function to visualize a batch on jupyter, in case tensorboard is finicky
 def log_batch_jupyter(batch):
     """
@@ -391,16 +387,26 @@ def log_batch_jupyter(batch):
 
 BATCH_SIZE = 4
 
-# 5 is a perfectly reasonable batch size
+# 4 is a perfectly reasonable batch size
 # (batch size does not have to be a power of 2)
 # See: https://sebastianraschka.com/blog/2022/batch-size-2.html
 
+# #######################
+# ##### TODO ########
+# #######################
+# HINT: Run dataset.channel_names 
+source_channel = ["TODO"]
+target_channel = ["TODO", "TODO"]
+
+# #######################
+# ##### TODO ########
+# #######################
 data_module = HCSDataModule(
     data_path,
     z_window_size=1,
-    architecture="UNeXt2_2D",
-    source_channel=["Phase3D"],
-    target_channel=["Nucl", "Mem"],
+    architecture= #TODO# 2D UNeXt2 architecture
+    source_channel=source_channel,
+    target_channel=target_channel,
     split_ratio=0.8,
     batch_size=BATCH_SIZE,
     num_workers=8,
@@ -408,56 +414,111 @@ data_module = HCSDataModule(
     augmentations=[],  # Turn off augmentation for now.
     normalizations=[],  # Turn off normalization for now.
 )
-data_module.setup("fit")
+# #######################
+# ##### TODO  ########
+# #######################
+# Setup the data_module to fit. HINT: data_module.setup()
 
+
+# Evaluate the data module
 print(
     f"Samples in training set: {len(data_module.train_dataset)}, "
     f"samples in validation set:{len(data_module.val_dataset)}"
 )
 train_dataloader = data_module.train_dataloader()
-
 # Instantiate the tensorboard SummaryWriter, logs the first batch and then iterates through all the batches and logs them to tensorboard.
-
 writer = SummaryWriter(log_dir=f"{log_dir}/view_batch")
 # Draw a batch and write to tensorboard.
 batch = next(iter(train_dataloader))
 log_batch_tensorboard(batch, 0, writer, "augmentation/none")
 writer.close()
+# %% tags=["solution"]
+# #######################
+# ##### SOLUTION ########
+# #######################
 
+BATCH_SIZE = 4
+# 4 is a perfectly reasonable batch size
+# (batch size does not have to be a power of 2)
+# See: https://sebastianraschka.com/blog/2022/batch-size-2.html
+
+source_channel = ["Phase3D"]
+target_channel = ["Nucl", "Mem"]
+
+data_module = HCSDataModule(
+    data_path,
+    z_window_size=1,
+    architecture="UNeXt2_2D",
+    source_channel=source_channel,
+    target_channel=target_channel,
+    split_ratio=0.8,
+    batch_size=BATCH_SIZE,
+    num_workers=8,
+    yx_patch_size=(256, 256),  # larger patch size makes it easy to see augmentations.
+    augmentations=[],  # Turn off augmentation for now.
+    normalizations=[],  # Turn off normalization for now.
+)
+
+# Setup the data_module to fit. HINT: data_module.setup()
+data_module.setup("fit")
+
+# Evaluate the data module
+print(
+    f"Samples in training set: {len(data_module.train_dataset)}, "
+    f"samples in validation set:{len(data_module.val_dataset)}"
+)
+train_dataloader = data_module.train_dataloader()
+# Instantiate the tensorboard SummaryWriter, logs the first batch and then iterates through all the batches and logs them to tensorboard.
+writer = SummaryWriter(log_dir=f"{log_dir}/view_batch")
+# Draw a batch and write to tensorboard.
+batch = next(iter(train_dataloader))
+log_batch_tensorboard(batch, 0, writer, "augmentation/none")
+writer.close()
+# %% [markdown]
+# <div class="alert alert-warning">
+# 
+# ### Questions
+# 1. What are the two channels in the target image?
+# 2. How many samples are in the training and validation set? What determined that split?
+#
+# Note: If tensorboard is not showing images, try refreshing and using the "Images" tab.
+# </div>
 
 # %% [markdown]
 # If your tensorboard is causing issues, you can visualize directly on Jupyter /VSCode
-
 # %%
+# Visualize in Jupyter
 log_batch_jupyter(batch)
 
+# %% [markdown]
+# <div class="alert alert-warning">
+# <h3> Question for Task 1.3 </h3>
+# 1. How do they make the model more robust to imaging parameters or conditions
+# without having to acquire data for every possible condition? <br>
+# </div>
 # %% [markdown] tags=[]
 # <div class="alert alert-info">
 #
 # ### Task 1.3
-# Add augmentations to the datamodule and rerun the setup.
-#
-# What kind of augmentations do you think are important for this task?
-#
-# How do they make the model more robust?
-#
-# Add augmentations to rotate about $\pi$ around z-axis, 30% scale in y,x,
+# Add the following augmentations: 
+# - Add augmentations to rotate about $\pi$ around z-axis, 30% scale in y,x,
 # shearing of 10% and no padding with zeros with a probablity of 80%.
-#
-# Add a Gaussian noise with a mean of 0.0 and standard deviation of 0.3 with a probability of 50%.
+# - Add a Gaussian noise with a mean of 0.0 and standard deviation of 0.3 with a probability of 50%.
 #
 # HINT: `RandAffined()` and `RandGaussianNoised()` are from
-# `viscy.transforms` [here](https://github.com/mehta-lab/VisCy/blob/main/viscy/transforms.py).
-# *Note these are MONAI transforms that have been redefined for VisCy.*
-# Can you tell what augmentation were applied from looking at the augmented images in Tensorboard?
-#
-# HINT:
+# `viscy.transforms` [here](https://github.com/mehta-lab/VisCy/blob/main/viscy/transforms.py). You can look at the docs by running `RandAffined?`.<br><br>
+# *Note these are MONAI transforms that have been redefined for VisCy.* 
 # [Compare your choice of augmentations by dowloading the pretrained models and config files](https://github.com/mehta-lab/VisCy/releases/download/v0.1.0/VisCy-0.1.0-VS-models.zip).
 # </div>
+
 # %%
 # Here we turn on data augmentation and rerun setup
-source_channel = ["Phase3D"]
-target_channel = ["Nucl", "Mem"]
+# #######################
+# ##### TODO ########
+# #######################
+# HINT: Run dataset.channel_names 
+source_channel = ["TODO"]
+target_channel = ["TODO", "TODO"]
 
 augmentations = [
     RandWeightedCropd(
@@ -478,7 +539,7 @@ augmentations = [
     # #######################
     # ##### TODO  ########
     # #######################
-    ##TODO: Add Random Affine Transorms
+    ## TODO: Add Random Affine Transorms
     ## Write code below
     ## TODO: Add Random Gaussian Noise
     ## Write code below
@@ -549,6 +610,8 @@ normalizations = [
 ]
 
 data_module.augmentations = augmentations
+
+# Setup the data_module to fit. HINT: data_module.setup()
 data_module.setup("fit")
 
 # get the new data loader with augmentation turned on
@@ -560,6 +623,12 @@ augmented_batch = next(iter(augmented_train_dataloader))
 log_batch_tensorboard(augmented_batch, 0, writer, "augmentation/some")
 writer.close()
 
+# %% [markdown]
+# <div class="alert alert-warning">
+# <h3> Question for Task 1.3 </h3>
+# 1. Look at your tensorboard. Can you tell the agumentations were applied to the sample batch? Compare the batch with and without augmentations. <br>
+# 2. Are these augmentations good enough? What else would you add?
+# </div>
 
 # %% [markdown]
 # Visualize directly on Jupyter
@@ -571,18 +640,98 @@ log_batch_jupyter(augmented_batch)
 """
 ## Train a 2D U-Net model to predict nuclei and membrane from phase.
 
-### Construct a 2D UNeXt2 using VisCy
-See ``viscy.unet.networks.Unet2D.Unet2d`` ([source code](https://github.com/mehta-lab/VisCy/blob/7c5e4c1d68e70163cf514d22c475da8ea7dc3a88/viscy/unet/networks/Unet2D.py#L7)) for configuration details.
+### Constructing a 2D UNeXt2 using VisCy
 """
-# %%
-# Create a 2D UNet.
+# %% [markdown]
+# <div class="alert alert-info">
+#
+# ### Task 1.5
+# - Run the next cell to instantiate the `UNeXt2_2D` model
+#   - Configure the network for the phase (source) to fluorescence cell nuclei and membrane (targets) regression task.
+#   - Call the VSUNet with the `"UNeXt2_2D"` architecture.
+# - Run the next cells to instantiate data module and trainer.
+#   - Add the source channel name and the target channel names
+# - Start the training <br>
+# 
+# <b> Note </b> <br>
+# See ``viscy.unet.networks.Unet2D.Unet2d`` ([source code](https://github.com/mehta-lab/VisCy/blob/7c5e4c1d68e70163cf514d22c475da8ea7dc3a88/viscy/unet/networks/Unet2D.py#L7)) to learn more about the configuration.
+# </div>
+#%% 
+# Here we are creating a 2D UNet.
+GPU_ID = 0
+
+BATCH_SIZE = 12
+YX_PATCH_SIZE = (256, 256)
+
+# #######################
+# ##### TODO ########
+# #######################
+# Dictionary that specifies key parameters of the model.
+phase2fluor_config = dict(
+    in_channels= #TODO how many input channels are we feeding Hint: int?,
+    out_channels= #TODO how many output channels are we solving for? Hint: int,
+    encoder_blocks=[3, 3, 9, 3],
+    dims=[96, 192, 384, 768],
+    decoder_conv_blocks=2,
+    stem_kernel_size=(1, 2, 2),
+    in_stack_depth= #TODO was this a 2D or 3D input? HINT: int,
+    pretraining=False,
+)
+
+# #######################
+# ##### TODO ########
+# #######################
+phase2fluor_model = VSUNet(
+    architecture= #TODO# 2D UNeXt2 architecture
+    model_config=phase2fluor_config.copy(),
+    loss_function=MixedLoss(l1_alpha=0.5, l2_alpha=0.0, ms_dssim_alpha=0.5),
+    schedule="WarmupCosine",
+    lr=2e-5,
+    log_batches_per_epoch=5,  # Number of samples from each batch to log to tensorboard.
+    freeze_encoder=False,
+)
+
+# #######################
+# ##### TODO ########
+# #######################
+# HINT: Run dataset.channel_names
+source_channel = ["TODO"]
+target_channel = ["TODO", "TODO"]
+
+# Setup the data module.
+phase2fluor_2D_data = HCSDataModule(
+    data_path,
+    architecture=#TODO# 2D UNeXt2 architecture. Same string as above.
+    source_channel=source_channel,
+    target_channel=target_channel,
+    z_window_size=1,
+    split_ratio=0.8,
+    batch_size=BATCH_SIZE,
+    num_workers=8,
+    yx_patch_size=YX_PATCH_SIZE,
+    augmentations=augmentations,
+    normalizations=normalizations,
+)
+phase2fluor_2D_data.setup("fit")
+# fast_dev_run runs a single batch of data through the model to check for errors.
+trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID], fast_dev_run=True)
+
+# trainer class takes the model and the data module as inputs.
+trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
+
+
+# %% tags=["solution"]
+
+# Here we are creating a 2D UNet.
 GPU_ID = 0
 
 BATCH_SIZE = 12
 YX_PATCH_SIZE = (256, 256)
 
 # Dictionary that specifies key parameters of the model.
-
+# #######################
+# ##### SOLUTION ########
+# #######################
 phase2fluor_config = dict(
     in_channels=1,
     out_channels=2,
@@ -599,16 +748,11 @@ phase2fluor_model = VSUNet(
     model_config=phase2fluor_config.copy(),
     loss_function=MixedLoss(l1_alpha=0.5, l2_alpha=0.0, ms_dssim_alpha=0.5),
     schedule="WarmupCosine",
-    lr=2e-6,
+    lr=2e-5,
     log_batches_per_epoch=5,  # Number of samples from each batch to log to tensorboard.
     freeze_encoder=False,
 )
 
-# %% [markdown]
-"""
-### Instantiate data module and trainer, test that we are setup to launch training.
-"""
-# %%
 source_channel = ["Phase3D"]
 target_channel = ["Nucl", "Mem"]
 # Setup the data module.
@@ -649,9 +793,8 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 # %% [markdown]
 # <div class="alert alert-info">
 #
-# ### Task 1.4
+# ### Task 1.5
 # Run the next cell to generate a graph representation of the model architecture.
-# Can you recognize the UNet structure and skip connections in this graph visualization?
 # </div>
 
 # %%
@@ -667,12 +810,18 @@ model_graph_phase2fluor = torchview.draw_graph(
 # Print the image of the model.
 model_graph_phase2fluor.visual_graph
 
+# %% [markdown]
+# <div class="alert alert-warning">
+#
+# ### Question:
+# Can you recognize the UNet structure and skip connections in this graph visualization?
+# </div>
 
 # %% [markdown]
 """
 <div class="alert alert-info">
 
-<h3> Task 1.5 </h3>
+<h3> Task 1.6 </h3>
 Start training by running the following cell. Check the new logs on the tensorboard.
 </div>
 """
@@ -684,7 +833,7 @@ GPU_ID = 0
 
 n_samples = len(phase2fluor_2D_data.train_dataset)
 steps_per_epoch = n_samples // BATCH_SIZE  # steps per epoch.
-n_epochs = 50  # Set this to 50 or the number of epochs you want to train for.
+n_epochs = 25  # Set this to 25-30 or the number of epochs you want to train for.
 
 trainer = VSTrainer(
     accelerator="gpu",
@@ -1065,7 +1214,7 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
 
         target_mem = min_max_scale(target_membrane[0,0])
         target_nuc = min_max_scale(target_nucleus[0,0])
-
+    
         # Noramalize the dataset using min-max scaling
         predicted_mem_phase2fluor = min_max_scale(
             predicted_image_phase2fluor[1, :, :, :].squeeze(0)
@@ -1135,7 +1284,7 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
         # Binary labels
         pred_label_binary = pred_label > 0
         target_label_binary = target_label > 0
-
+        break
         # Use Coco metrics to get mean average precision
         coco_metrics = mean_average_precision(pred_label, target_label)
         # Find unique number of labels

@@ -41,7 +41,7 @@ VisCy exploits recent advances in data and metadata formats
 
 ## Setup
 
-Make sure that you are inside of the `image_translation` folder by using the `cd` command to change directories if needed.
+Make sure that you are inside of the `image_translation/part_1` folder by using the `cd` command to change directories if needed.
 
 Run the setup script to create the environment for this exercise and download the dataset.
 ```bash
