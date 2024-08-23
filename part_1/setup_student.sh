@@ -20,7 +20,7 @@ $ENV_PATH/bin/pip install "jupyterlab"
 output_dir=/mnt/efs/dlmbl
 # Assuming that we ran the setup_TA.sh that downloads the data to nfs shared storage
 # Creating the simlink to the NFS partition
-ln -s "$output_dir"/data ~/data
+# ln -s "$output_dir"/data ~/data
 
 # Change back to the starting directory
 cd $START_DIR

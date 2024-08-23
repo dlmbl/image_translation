@@ -21,7 +21,7 @@ output_dir=/mnt/efs/dlmbl
 mkdir -p "$output_dir"/data/06_image_translation/part1/training
 mkdir -p "$output_dir"/data/06_image_translation/part1/test
 mkdir -p "$output_dir"/data/06_image_translation/part1/pretrained_models
-ln -s "$output_dir"/data ~/data
+# ln -s "$output_dir"/data ~/data
 
 # Change to the target directory
 cd ~/data/06_image_translation/part1/training

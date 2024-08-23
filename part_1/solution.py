@@ -115,22 +115,26 @@ seed_everything(42, workers=True)
 
 # Paths to data and log directory
 top_dir = Path(
-    f"/{os.environ['HOME']}/data/"
-)  # If this fails, make sure this to point to your data directory.
+    "/mnt/efs/dlmbl/data/"
+)  # If this fails, make sure this to point to your data directory in the shared mounting point inside /dlmbl/data
 
+# Path to the training data
 data_path = (
     top_dir / "06_image_translation/part1/training/a549_hoechst_cellmask_train_val.zarr"
 )
-log_dir = top_dir / "06_image_translation/part1/logs/"
+
+# Path where we will save our training logs
+training_top_dir = Path(f"{os.environ['HOME']}/data/")
+# Create top_training_dir directory if needed, and launch tensorboard
+training_top_dir.mkdir(parents=True, exist_ok=True)
+log_dir = training_top_dir / "06_image_translation/part1/logs/"
+# Create log directory if needed, and launch tensorboard
+log_dir.mkdir(parents=True, exist_ok=True)
 
 if not data_path.exists():
     raise FileNotFoundError(
         f"Data not found at {data_path}. Please check the top_dir and data_path variables."
     )
-
-# %%
-# Create log directory if needed, and launch tensorboard
-log_dir.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown] tags=[]
 # The next cell starts tensorboard.
@@ -140,9 +144,8 @@ log_dir.mkdir(parents=True, exist_ok=True)
 
 # </div>
 
-# %% Imports and paths tags=[]
-
-
+# %%  tags=[]
+# Imports and paths
 # Function to find an available port
 def find_free_port():
     import socket
@@ -730,6 +733,7 @@ phase2fluor_model = VSUNet(
 # %% [markdown] tags=[]
 # ### Instantiate data module and trainer, test that we are setup to launch training.
 # %%
+# Selecting the source and target channel names from the dataset.
 source_channel = ["Phase3D"]
 target_channel = ["Nucl", "Mem"]
 # Setup the data module.
@@ -850,7 +854,7 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 # We will use the following metrics to evaluate the accuracy of regression of the model:
 
 # - [Person Correlation](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient).
-# - [Structural similarity](https://en.wikipedia.org/wiki/Structural_similarity) (SSIM).
+# - [Structural similarity](https://en.wikipedia.org/wiki/Structural_similarity) (SSIM). 
 
 # You should also look at the validation samples on tensorboard
 # (hint: the experimental data in nuclei channel is imperfect.)
@@ -865,7 +869,7 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 
 # </div>
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ```
 # #######################
 # ##### Todo ############
@@ -877,14 +881,27 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 #
 # - Structural similarity:
 
-# %% [markdown]
-# Let's compute metrics directly and plot below.
-# If you weren't able to train or training didn't complete please run the following lines to load the latest checkpoint
+# %% [markdown] tags=[]
+# ### Let's compute metrics directly and plot below.
+#%% [markdown] tags=[]
+# <div class="alert alert-danger">
+# If you weren't able to train or training didn't complete please run the following lines to load the latest checkpoint <br>
+# 
 # ```python
 # phase2fluor_model_ckpt = natsorted(glob(
 #    str(top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
 # ))[-1]
 #```
+#<br>
+# NOTE: if their model didn't go past epoch 5, lost their checkpoint, or didnt train anything. 
+# Run the following:
+# 
+#```python
+#phase2fluor_model_ckpt = natsorted(glob(
+#  str(top_dir/"06_image_translation/backup/phase2fluor/version_3/checkpoints/*.ckpt")
+#))[-1]
+#````
+# </div>
 # %%
 # Setup the test data module.
 test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
@@ -906,9 +923,6 @@ test_metrics = pd.DataFrame(
     columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
 )
 
-# %%
-#
-phase2fluor_model = 
 #%%
 # Compute metrics directly and plot here.
 def normalize_fov(input:ArrayLike):
@@ -946,24 +960,32 @@ for i, sample in enumerate(tqdm(test_data.test_dataloader(), desc="Computing met
         "SSIM_mem": ssim_mem,
     }
 
+# Plot the following metrics
 test_metrics.boxplot(
     column=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"],
     rot=30,
 )
-# %%
-# Plot the predicted image
-channel_titles = ["Phase", "Nuclei", "Membrane"]
-fig, axes = plt.subplots(2, 3, figsize=(30, 20))
 
+#%%
+# Adjust the image to the 0.5-99.5 percentile range.
+def process_image(image):
+    p_low, p_high = np.percentile(image, (0.5, 99.5))
+    return np.clip(image, p_low, p_high)
+
+# Plot the predicted image vs target image.
+channel_titles = ["Phase", "Target Nuclei", "Target Membrane", "Predicted Nuclei", "Predicted Membrane"]
+fig, axes = plt.subplots(5, 1, figsize=(20, 20))
+
+# Get a writer to output the images into tensorboard and plot the source, predictions and target images
 for i, sample in enumerate(test_data.test_dataloader()):
     # Plot the phase image
     phase_image = sample["source"]
     channel_image = phase_image[0, 0, 0]
     p_low, p_high = np.percentile(channel_image, (0.5, 99.5))
     channel_image = np.clip(channel_image, p_low, p_high)
-    axes[0, 0].imshow(channel_image, cmap="gray")
-    axes[0, 0].axis("off")
-    axes[0, 0].set_title(channel_titles[0])
+    axes[0].imshow(channel_image, cmap="gray")
+    axes[0].axis("off")
+    axes[0].set_title(channel_titles[0])
 
     with torch.inference_mode():  # turn off gradient computation.
         predicted_image = (
@@ -974,32 +996,26 @@ for i, sample in enumerate(test_data.test_dataloader()):
         )
 
     target_image = sample["target"].cpu().numpy().squeeze(0)
-    # Plot the predicted images
-    for i in range(predicted_image.shape[-4]):
-        channel_image = predicted_image[i, 0]
-        p_low, p_high = np.percentile(channel_image, (0.1, 99.5))
-        channel_image = np.clip(channel_image, p_low, p_high)
-        axes[0, i + 1].imshow(channel_image, cmap="gray")
-        axes[0, i + 1].axis("off")
-        axes[0, i + 1].set_title(f"VS {channel_titles[i + 1]}")
+    phase_raw = process_image(phase_image[0, 0, 0])
+    predicted_nuclei = process_image(predicted_image[0,0])
+    predicted_membrane = process_image(predicted_image[1,0])
+    target_nuclei = process_image(target_image[0,0])
+    target_membrane = process_image(target_image[1,0])
+       # Concatenate all images side by side
+    combined_image = np.concatenate(
+        (phase_raw, predicted_nuclei, predicted_membrane, target_nuclei, target_membrane),
+        axis=1
+    )
 
-    # Plot the target images
-    for i in range(target_image.shape[-4]):
-        channel_image = target_image[i, 0]
-        p_low, p_high = np.percentile(channel_image, (0.5, 99.5))
-        channel_image = np.clip(channel_image, p_low, p_high)
-        axes[1, i].imshow(channel_image, cmap="gray")
-        axes[1, i].axis("off")
-        axes[1, i].set_title(f"Target {dataset.channel_names[i+1]}")
-
-    # Remove any unused subplots
-    for j in range(i + 1, 3):
-        fig.delaxes(axes[1, j])
+    # Plot the phase,target nuclei, target membrane, predicted nuclei, predicted membrane
+    axes[1].imshow(target_nuclei, cmap="gray")
+    axes[2].imshow(target_membrane, cmap="gray")
+    axes[3].imshow(predicted_nuclei, cmap="gray")
+    axes[4].imshow(predicted_membrane, cmap="gray")
 
     plt.tight_layout()
     plt.show()
     break
-
 # %% [markdown] tags=[]
 # <div class="alert alert-info">
 
@@ -1063,13 +1079,13 @@ pretrained_phase2fluor.eval()
 ### Re-load your trained model
 # NOTE: assuming the latest checkpoint it your latest training and model
 phase2fluor_model_ckpt = natsorted(glob(
-    str(top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
+    str(training_top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
 ))[-1]
 
 # NOTE: if their model didn't go past epoch 5, lost their checkpoint, or didnt train anything. 
 # Uncomment the next lines
 #phase2fluor_model_ckpt = natsorted(glob(
-#  str("/mnt/efs/dlmbl/data/06_image_translation/backup/phase2fluor/version_3/checkpoints/*.ckpt")
+#  str(top_dir/"06_image_translation/backup/phase2fluor/version_3/checkpoints/*.ckpt")
 #))[-1]
 
 
@@ -1088,6 +1104,7 @@ phase2fluor_model = VSUNet.load_from_checkpoint(
     phase2fluor_model_ckpt,
     architecture="UNeXt2_2D",
     model_config = phase2fluor_config,
+    accelerator='gpu'
 )
 phase2fluor_model.eval()
 #%% [markdown] tags=[]
@@ -1146,7 +1163,7 @@ def cellpose_segmentation(prediction:ArrayLike,target:ArrayLike)->Tuple[torch.Sh
 # %%
 # Setting the paths for the test data and the output segmentation
 test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
-output_segmentation_path=top_dir /"06_image_translation/part1/pretrained_model_segmentations.zarr"
+output_segmentation_path= training_top_dir /"06_image_translation/part1/pretrained_model_segmentations.zarr"
 
 # Creating the dataframes to store the pixel and segmentation metrics
 test_pixel_metrics = pd.DataFrame(
@@ -1174,6 +1191,12 @@ mem_cidx =  channel_names.index("Mem")
 nuc_label_cidx =  channel_names.index("nuclei_segmentation")
 
 # %%
+def min_max_scale(image:ArrayLike)->ArrayLike:
+    "Normalizing the image using min-max scaling"
+    min_val = image.min()
+    max_val = image.max()
+    return (image - min_val) / (max_val - min_val)
+
 # Iterating through the test dataset positions to:
 positions = list(test_dataset.positions())
 total_positions = len(positions)
@@ -1189,6 +1212,9 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
         target_nucleus =  pos.data[0,nuc_cidx:nuc_cidx+1,Z_slice]
         target_membrane =  pos.data[0,mem_cidx:mem_cidx+1,Z_slice]
         target_nuc_label = pos.data[0,nuc_label_cidx:nuc_label_cidx+1,Z_slice]
+
+        #normalize the phase
+        phase_image = normalize_fov(phase_image)
         
         # Running the prediction for both models
         phase_image = torch.from_numpy(phase_image).type(torch.float32)
@@ -1202,21 +1228,21 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
         predicted_image_pretrained = predicted_image_pretrained.cpu().numpy().squeeze(0)
         phase_image = phase_image.cpu().numpy().squeeze(0)
 
-        target_mem = normalize_fov(target_membrane[0,0])
-        target_nuc = normalize_fov(target_nucleus[0,0])
+        target_mem = min_max_scale(target_membrane[0,0])
+        target_nuc = min_max_scale(target_nucleus[0,0])
     
         # Normalizing the dataset using min-max scaling
-        predicted_mem_phase2fluor = normalize_fov(
+        predicted_mem_phase2fluor = min_max_scale(
             predicted_image_phase2fluor[1, :, :, :].squeeze(0)
         )
-        predicted_nuc_phase2fluor = normalize_fov(
+        predicted_nuc_phase2fluor = min_max_scale(
             predicted_image_phase2fluor[0, :, :, :].squeeze(0)
         )
 
-        predicted_mem_pretrained = normalize_fov(
+        predicted_mem_pretrained = min_max_scale(
             predicted_image_pretrained[1, :, :, :].squeeze(0)
         )
-        predicted_nuc_pretrained = normalize_fov(
+        predicted_nuc_pretrained = min_max_scale(
             predicted_image_pretrained[0, :, :, :].squeeze(0)
         )
 
@@ -1327,14 +1353,14 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
 
         # Update the progress bar
         pbar.update(1)
-
+    
 # Close the OME-Zarr files
 test_dataset.close()
 segmentation_store.close()
 # %%
 # Save the test metrics into a dataframe
-pixel_metrics_path = top_dir/"06_image_translation/part1/VS_metrics_pixel_part_1.csv"
-segmentation_metrics_path = top_dir/"06_image_translation/part1/VS_metrics_segments_part_1.csv"
+pixel_metrics_path = training_top_dir/"06_image_translation/part1/VS_metrics_pixel_part_1.csv"
+segmentation_metrics_path = training_top_dir/"06_image_translation/part1/VS_metrics_segments_part_1.csv"
 test_pixel_metrics.to_csv(pixel_metrics_path)
 test_segmentation_metrics.to_csv(segmentation_metrics_path)
 
@@ -1382,13 +1408,21 @@ plt.show()
 # - How is your model compared to the pretrained model? How can you improve it?
 
 # %% [markdown]
-# ## Plotting the predictions and segmentations
-# Here we will plot the predictions and segmentations side by side for the pretrained and trained models.
-
-# Please modify the crop size and Y,X slicing to view different areas of the FOV.
+# <div class="alert alert-info">
+#
+# ### Plotting the predictions and segmentations
+# Here we will plot the predictions and segmentations side by side for the pretrained and trained models.<br>
+# - How do yout model, the pretrained model and the ground truth compare?<br>
+# - How do the segmentations compare? <br>
+# Feel free to modify the crop size and Y,X slicing to view different areas of the FOV
+# </div>
 # %% tags=["task"]
+
+# Get the shape of the 2D image
+Y,X = phase_image.shape[-2:]
 ######## TODO ##########
 # Modify the crop size and Y,X slicing to view different areas of the FOV
+
 crop = 256
 y_slice=slice(Y//2-crop//2,Y//2+crop//2)
 x_slice=slice(X//2-crop//2,X//2+crop//2)
