@@ -663,7 +663,7 @@ phase2fluor_model = VSUNet(
     model_config=phase2fluor_config.copy(),
     loss_function=MixedLoss(l1_alpha=0.5, l2_alpha=0.0, ms_dssim_alpha=0.5),
     schedule="WarmupCosine",
-    lr=2e-5,
+    lr=2e-4,
     log_batches_per_epoch=5,  # Number of samples from each batch to log to tensorboard.
     freeze_encoder=False,
 )
@@ -725,7 +725,7 @@ phase2fluor_model = VSUNet(
     model_config=phase2fluor_config.copy(),
     loss_function=MixedLoss(l1_alpha=0.5, l2_alpha=0.0, ms_dssim_alpha=0.5),
     schedule="WarmupCosine",
-    lr=2e-5,
+    lr=2e-4,
     log_batches_per_epoch=5,  # Number of samples from each batch to log to tensorboard.
     freeze_encoder=False,
 )
