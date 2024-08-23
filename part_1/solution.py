@@ -1094,10 +1094,19 @@ phase2fluor_model.eval()
 # <div class="alert alert-warning">
 # <h3> Question </h3> 
 # 1. Can we evaluate a model's performance based on their segmentations?<br>
-# 2. Look up IoU, Jaccard index, dice, and AP metrics. LINK:https://metrics-reloaded.dkfz.de/metric-library <br>
+# 2. Look up IoU or Jaccard index, dice coefficient, and AP metrics. LINK:https://metrics-reloaded.dkfz.de/metric-library <br>
 # We will evaluate the performance of your trained model with a pre-trained model using pixel based metrics as above and
 # segmantation based metrics including (mAP@0.5, dice, accuracy and jaccard index). <br>
 # </div>
+#%% [markdown] tags=["solution"]
+#
+# - <b> IoU (Intersection over Union): </b> Also referred to as the Jaccard index, is essentially a method to quantify the percent overlap between the target and predicted masks. 
+# It is calculated as the intersection of the target and predicted masks divided by the union of the target and predicted masks. <br>
+# - <b> Dice Coefficient:</b> Metric used to evaluate the similarity between two sets.<br>
+# It is calculated as twice the intersection of the target and predicted masks divided by the sum of the target and predicted masks.<br>
+# - <b> mAP (mean Average Precision):</b>  The mean Average Precision (mAP) is a metric used to evaluate the performance of object detection models. 
+# It is calculated as the average precision across all classes and is used to measure the accuracy of the model in localizing objects.
+#
 # %% [markdown] tags=[]
 # ### Let's compute the metrics for the test dataset
 # Before you run the following code, make sure you have the pretrained model loaded and the test data is ready.
@@ -1158,7 +1167,7 @@ test_dataset.print_tree()
 channel_names = test_dataset.channel_names
 print(f'Channel names: {channel_names}')
 
-# Finding the channel indeces for the corresponding channel names
+# Finding the channel indices for the corresponding channel names
 phase_cidx = channel_names.index("Phase3D")
 nuc_cidx = channel_names.index("Nucl")
 mem_cidx =  channel_names.index("Mem")
@@ -1196,7 +1205,7 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
         target_mem = normalize_fov(target_membrane[0,0])
         target_nuc = normalize_fov(target_nucleus[0,0])
     
-        # Noramalize the dataset using min-max scaling
+        # Normalizing the dataset using min-max scaling
         predicted_mem_phase2fluor = normalize_fov(
             predicted_image_phase2fluor[1, :, :, :].squeeze(0)
         )
@@ -1285,6 +1294,7 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
         }
 
         pred_label,target_label= cellpose_segmentation(predicted_nuc_pretrained,target_nucleus)
+        
         # Binary labels
         pred_label_binary = pred_label > 0
         target_label_binary = target_label > 0
