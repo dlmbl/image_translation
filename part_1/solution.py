@@ -46,11 +46,6 @@
 # - [Liu, Z. and Hirata-Miyasaki, E. et al. (2024) Robust Virtual Staining of Cellular Landmarks](https://www.biorxiv.org/content/10.1101/2024.05.31.596901v2.full.pdf)
 # - [Guo et al. (2020) Revealing architectural order with quantitative label-free imaging and deep learning. eLife](https://elifesciences.org/articles/55502)
 
-
-# %% [markdown] tags=[]
-# 📖 As you work through parts 2, please share the layouts of your models (output of torchview)
-# and their performance with everyone via
-# [this Google Doc](https://docs.google.com/document/d/1Mq-yV8FTG02xE46Mii2vzPJVYSRNdeOXkeU-EKu-irE/edit?usp=sharing). 📖
 # %% [markdown] tags=[]
 # <div class="alert alert-info">
 # The exercise is organized in 2 parts
@@ -884,6 +879,12 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 
 # %% [markdown]
 # Let's compute metrics directly and plot below.
+# If you weren't able to train or training didn't complete please run the following lines to load the latest checkpoint
+# ```python
+# phase2fluor_model_ckpt = natsorted(glob(
+#    str(top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
+# ))[-1]
+#```
 # %%
 # Setup the test data module.
 test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
@@ -906,13 +907,18 @@ test_metrics = pd.DataFrame(
 )
 
 # %%
+#
+phase2fluor_model = 
+#%%
 # Compute metrics directly and plot here.
-def min_max_scale(input):
-    return (input - np.min(input)) / (np.max(input) - np.min(input))
-
+def normalize_fov(input:ArrayLike):
+    "Normalizing the fov with zero mean and unit variance"
+    mean = np.mean(input)
+    std = np.std(input)
+    return (input - mean) / std
 
 for i, sample in enumerate(tqdm(test_data.test_dataloader(), desc="Computing metrics per sample")):
-    phase_image = sample["source"]
+    phase_image = sample["source"].to(phase2fluor_model.device)
     with torch.inference_mode():  # turn off gradient computation.
         predicted_image = phase2fluor_model(phase_image)
 
@@ -921,11 +927,11 @@ for i, sample in enumerate(tqdm(test_data.test_dataloader(), desc="Computing met
     )  # Squeezing batch dimension.
     predicted_image = predicted_image.cpu().numpy().squeeze(0)
     phase_image = phase_image.cpu().numpy().squeeze(0)
-    target_mem = min_max_scale(target_image[1, 0, :, :])
-    target_nuc = min_max_scale(target_image[0, 0, :, :])
+    target_mem = normalize_fov(target_image[1, 0, :, :])
+    target_nuc = normalize_fov(target_image[0, 0, :, :])
     # slicing channel dimension, squeezing z-dimension.
-    predicted_mem = min_max_scale(predicted_image[1, :, :, :].squeeze(0))
-    predicted_nuc = min_max_scale(predicted_image[0, :, :, :].squeeze(0))
+    predicted_mem = normalize_fov(predicted_image[1, :, :, :].squeeze(0))
+    predicted_nuc = normalize_fov(predicted_image[0, :, :, :].squeeze(0))
 
     # Compute SSIM and pearson correlation.
     ssim_nuc = metrics.structural_similarity(target_nuc, predicted_nuc, data_range=1)
@@ -997,9 +1003,9 @@ for i, sample in enumerate(test_data.test_dataloader()):
 # %% [markdown] tags=[]
 # <div class="alert alert-info">
 
-# <h3> Task 2.2 Compute the metrics with respect to the pretrained model VSCyto2D </h3>
+# <h3> Task 2.2 Loading the pretrained model VSCyto2D </h3>
 # Here we will compare your model with the VSCyto2D pretrained model by computing the pixel-based metrics and segmentation-based metrics.
-
+#
 # <ul>
 # <li>When you ran the `setup.sh` you also downloaded the models in `/06_image_translation/part1/pretrained_models/VSCyto2D/*.ckpt`</li>
 # <li>Load the <b>VSCyto2 model</b> model checkpoint and the configuration file</li>
@@ -1007,8 +1013,6 @@ for i, sample in enumerate(test_data.test_dataloader()):
 # </ul>
 # <br>
 
-# We will evaluate the performance of your trained model with a pre-trained model using pixel based metrics as above and
-# segmantation based metrics including (mAP@0.5, dice, accuracy and jaccard index).
 # </div>
 
 
@@ -1062,6 +1066,13 @@ phase2fluor_model_ckpt = natsorted(glob(
     str(top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
 ))[-1]
 
+# NOTE: if their model didn't go past epoch 5, lost their checkpoint, or didnt train anything. 
+# Uncomment the next lines
+#phase2fluor_model_ckpt = natsorted(glob(
+#  str("/mnt/efs/dlmbl/data/06_image_translation/backup/phase2fluor/version_3/checkpoints/*.ckpt")
+#))[-1]
+
+
 phase2fluor_config = dict(
     in_channels=1,
     out_channels=2,
@@ -1079,7 +1090,14 @@ phase2fluor_model = VSUNet.load_from_checkpoint(
     model_config = phase2fluor_config,
 )
 phase2fluor_model.eval()
-
+#%% [markdown] tags=[]
+# <div class="alert alert-warning">
+# <h3> Question </h3> 
+# 1. Can we evaluate a model's performance based on their segmentations?<br>
+# 2. Look up IoU, Jaccard index, dice, and AP metrics. LINK:https://metrics-reloaded.dkfz.de/metric-library <br>
+# We will evaluate the performance of your trained model with a pre-trained model using pixel based metrics as above and
+# segmantation based metrics including (mAP@0.5, dice, accuracy and jaccard index). <br>
+# </div>
 # %% [markdown] tags=[]
 # ### Let's compute the metrics for the test dataset
 # Before you run the following code, make sure you have the pretrained model loaded and the test data is ready.
@@ -1094,10 +1112,7 @@ phase2fluor_model.eval()
 # - The segmentations will be stored in the `segmentation_store` zarr file
 # - Analyze the code while it runs.
 # %%
-# Define the function to compute the cellpose segmentation and the normalization
-def min_max_scale(input):
-    return (input - np.min(input)) / (np.max(input) - np.min(input))
-
+# Define the function to compute the cellpose segmentation
 def cellpose_segmentation(prediction:ArrayLike,target:ArrayLike)->Tuple[torch.ShortTensor]:
     #NOTE these are hardcoded for this notebook and A549 dataset
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -1178,21 +1193,21 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
         predicted_image_pretrained = predicted_image_pretrained.cpu().numpy().squeeze(0)
         phase_image = phase_image.cpu().numpy().squeeze(0)
 
-        target_mem = min_max_scale(target_membrane[0,0])
-        target_nuc = min_max_scale(target_nucleus[0,0])
+        target_mem = normalize_fov(target_membrane[0,0])
+        target_nuc = normalize_fov(target_nucleus[0,0])
     
         # Noramalize the dataset using min-max scaling
-        predicted_mem_phase2fluor = min_max_scale(
+        predicted_mem_phase2fluor = normalize_fov(
             predicted_image_phase2fluor[1, :, :, :].squeeze(0)
         )
-        predicted_nuc_phase2fluor = min_max_scale(
+        predicted_nuc_phase2fluor = normalize_fov(
             predicted_image_phase2fluor[0, :, :, :].squeeze(0)
         )
 
-        predicted_mem_pretrained = min_max_scale(
+        predicted_mem_pretrained = normalize_fov(
             predicted_image_pretrained[1, :, :, :].squeeze(0)
         )
-        predicted_nuc_pretrained = min_max_scale(
+        predicted_nuc_pretrained = normalize_fov(
             predicted_image_pretrained[0, :, :, :].squeeze(0)
         )
 
@@ -1250,7 +1265,7 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
         # Binary labels
         pred_label_binary = pred_label > 0
         target_label_binary = target_label > 0
-        break
+
         # Use Coco metrics to get mean average precision
         coco_metrics = mean_average_precision(pred_label, target_label)
         # Find unique number of labels
@@ -1299,7 +1314,7 @@ with tqdm(total=total_positions, desc="Processing FOVs") as pbar:
         output_array[0,1,0]=predicted_mem_pretrained
         output_array[0,2,0]=np.array(pred_label)
         position.create_image("0",output_array)
-        
+
         # Update the progress bar
         pbar.update(1)
 
@@ -1419,15 +1434,7 @@ plt.show()
 # Continue to Part 2: Image translation with generative models.
 # </h2>
 
-# Congratulations! You have trained several image translation models now!
-# <br>
-# Please remember to document the hyperparameters,
-# snapshots of predictions on validation set,
-# and loss curves for your models and add the final performance in
-# <a href="https://docs.google.com/document/d/1Mq-yV8FTG02xE46Mii2vzPJVYSRNdeOXkeU-EKu-irE/edit?usp=sharing">
-# this google doc
-# </a>.
-# We'll discuss our combined results as a group.
+# Congratulations! You have trained an image translation model and evaluated its performance.
 # </div>
 
 # %%
