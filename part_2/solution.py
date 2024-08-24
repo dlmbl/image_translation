@@ -235,13 +235,23 @@ train_model(
 
 ## A heads up of what to expect from the training...
 <br><br>
+<<<<<<< HEAD
 <br>- Visualise results<br>: We can observe how the performance improves over time using the images tab and the sliding window.
+=======
+<b>- Visualise results<b>: We can observe how the performance improves over time using the images tab and the sliding window.
+>>>>>>> ff0946289bce4234aedb07af642c943d6d40dd24
 <br><br>
-**- Discriminator Predicted Probabilities**: We plot the discriminator's predicted probabilities that the phase with fluorescence is phase and fluorescence and that the phase with virtual stain is phase with virtual stain. It is typically trained until the discriminator can no longer classify whether or not the generated images are real or fake better than a random guess (p(0.5)). We plot this for both the training and validation datasets.
+<b>- Discriminator Predicted Probabilities<b>: We plot the discriminator's predicted probabilities that the phase with fluorescence is phase and fluorescence and that the phase with virtual stain is phase with virtual stain. It is typically trained until the discriminator can no longer classify whether or not the generated images are real or fake better than a random guess (p(0.5)). We plot this for both the training and validation datasets.
 <br><br>
+<<<<<<< HEAD
 <br>- Adversarial Loss<br>: We can formulate the adversarial loss as a Least Squared Error Loss in which for real data the discriminator should output a value close to 1 and for fake data a value close to 0. The generator's goal is to make the discriminator output a value as close to 1 for fake data. We plot the least squared error loss.
 <br><br>
 <br>- Feature Matching Loss<br>: Both networks are also trained using the generator feature matching loss which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.
+=======
+<b>- Adversarial Loss<b>: We can formulate the adversarial loss as a Least Squared Error Loss in which for real data the discriminator should output a value close to 1 and for fake data a value close to 0. The generator's goal is to make the discriminator output a value as close to 1 for fake data. We plot the least squared error loss.
+<br><br>
+<b>- Feature Matching Loss<b>: Both networks are also trained using the generator feature matching loss which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.
+>>>>>>> ff0946289bce4234aedb07af642c943d6d40dd24
 <br><br>
 This implementation allows for the turning on/off of the least-square loss term by setting the opt.no_lsgan flag to the model options. As well as the turning off of the feature matching loss term by setting the opt.no_ganFeat_loss flag to the model options. Something you might want to explore in the next section!<br><br>
 </div>
@@ -274,15 +284,33 @@ log_dir = f"{top_dir}/model_tensorboard/{opt.name}/"
 %reload_ext tensorboard
 %tensorboard --logdir $log_dir
 
+<<<<<<< HEAD
 
 # %% [markdown]
 """
 <div class="alert alert-success">
-## Checkpoint 2
-Congratulations! You should now have a better understanding the different loss components of Pix2PixHD GAN and how they are used to train the model. You should also have a good understanding of the fit of the model during training on the training and validation datasets.
+=======
+# %% [markdown]
+#
+## Training Results
+#Please note down your thoughts about the following questions...
+#
+# **- What do you notice about the virtual staining predictions? How do they appear compared to the regression-based approach? Can you spot any hallucinations?**<br><br> 
+# **- What do you notice about the probabilities of the discriminators? How do the values compare during training compared to validation?**<br><br>
+# **- What do you notice about the feature matching L1 loss?**<br><br>
+# **- What do you notice about the least-square loss?**<br><br>
+#
 
-</div>
-"""
+# %% [markdown]
+#
+#<div class="alert alert-success">
+#
+>>>>>>> ff0946289bce4234aedb07af642c943d6d40dd24
+## Checkpoint 2
+#Congratulations! You should now have a better understanding the different loss components of Pix2PixHD GAN and how they are used to train the model. You should also have a good understanding of the fit of the model during training on the training and validation datasets.
+#
+#</div>
+
 
 # %% [markdown]
 """

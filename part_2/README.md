@@ -52,12 +52,6 @@ Make sure that you are inside of the `image_translation` folder by using the `cd
 
 Make sure that you can use conda to switch environments.
 
-```bash
-conda init
-```
-
-**Close your shell, and login again.** 
-
 Run the setup script to create the environment for this exercise and download the dataset.
 ```shell
 source setup.sh

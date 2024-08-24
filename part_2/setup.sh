@@ -18,9 +18,14 @@ cd ~/data/06_image_translation/part2/GAN_code/GANs_MI2I
 echo "Current directory after navigating to GANs_MI2I: $(pwd)"
 
 # # Find path to the mamba environment.
+<<<<<<< HEAD
 
 ENV_PATH=$(conda info --envs | grep 06_image_translation | awk '{print $NF}')
 $ENV_PATH/bin/pip install "dominate"
+=======
+conda activate 06_image_translation
+pip install dominate
+>>>>>>> ff0946289bce4234aedb07af642c943d6d40dd24
 
 # Download the weights and pretrained tensorboards
 #mkdir -p ~/data/06_image_translation/part2/model_weights
@@ -42,7 +47,11 @@ echo "Curent Directory: $(pwd)"
 output_dir=~/data/06_image_translation/part2/tiff_files
 mkdir -p "$output_dir"
 echo "Output directory created at: $output_dir"
+<<<<<<< HEAD
 $ENV_PATH/bin/python download_and_split_dataset.py --output_image_folder "$output_dir" --crop_size 512
+=======
+python download_and_split_dataset.py --output_image_folder "$output_dir" --crop_size 512
+>>>>>>> ff0946289bce4234aedb07af642c943d6d40dd24
 echo "Dataset downloaded and split."
 conda deactivate
 # Return to the starting directory
