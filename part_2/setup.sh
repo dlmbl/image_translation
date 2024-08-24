@@ -18,20 +18,21 @@ cd ~/data/06_image_translation/part2/GAN_code/GANs_MI2I
 echo "Current directory after navigating to GANs_MI2I: $(pwd)"
 
 # # Find path to the mamba environment.
+
 ENV_PATH=$(conda info --envs | grep 06_image_translation | awk '{print $NF}')
 $ENV_PATH/bin/pip install "dominate"
 
 # Download the weights and pretrained tensorboards
-mkdir -p ~/data/06_image_translation/part2/model_weights
-mkdir -p ~/data/06_image_translation/part2/model_tensorboard
+#mkdir -p ~/data/06_image_translation/part2/model_weights
+#mkdir -p ~/data/06_image_translation/part2/model_tensorboard
 
 # Download into model_tensorboard and then move weights folder
-cd ~/data/06_image_translation/part2/model_tensorboard
-echo "Current Directory: $(pwd)"
-wget -O dlmbl_requisites.zip "https://zenodo.org/record/13173900/files/dlmbl_requisites.zip?download=1"
-unzip dlmbl_requisites.zip
-mv ~/data/06_image_translation/part2/model_tensorboard/dlmbl_vsnuclei/dlmbl_vsnuclei ~/data/06_image_translation/part2/model_weights
-mv ~/data/06_image_translation/part2/model_tensorboard/dlmbl_vscyto/dlmbl_vscyto ~/data/06_image_translation/part2/model_weights
+#cd ~/data/06_image_translation/part2/model_tensorboard
+#echo "Current Directory: $(pwd)"
+#wget -O dlmbl_requisites.zip "https://zenodo.org/record/13173900/files/dlmbl_requisites.zip?download=1"
+#unzip dlmbl_requisites.zip
+#mv ~/data/06_image_translation/part2/model_tensorboard/dlmbl_vsnuclei/dlmbl_vsnuclei ~/data/06_image_translation/part2/model_weights
+#mv ~/data/06_image_translation/part2/model_tensorboard/dlmbl_vscyto/dlmbl_vscyto ~/data/06_image_translation/part2/model_weights
 
 # Download and split the dataset
 cd ~/data/06_image_translation/part2/GAN_code/GANs_MI2I
@@ -41,8 +42,7 @@ echo "Curent Directory: $(pwd)"
 output_dir=~/data/06_image_translation/part2/tiff_files
 mkdir -p "$output_dir"
 echo "Output directory created at: $output_dir"
-conda activate 06_image_translation
-python download_and_split_dataset.py --output_image_folder "$output_dir" --crop_size 512
+$ENV_PATH/bin/python download_and_split_dataset.py --output_image_folder "$output_dir" --crop_size 512
 echo "Dataset downloaded and split."
 conda deactivate
 # Return to the starting directory

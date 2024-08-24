@@ -50,7 +50,7 @@ If you have issues with getting the kernel to load please follow the following s
 3. Reload VS Code via Ctrl+Shift+P, then select Reload Window.
 """
 #%%
-!python -m ipykernel install --user --name 06_image_translation --display-name "Python 06_image_translation"
+# !python -m ipykernel install --user --name 06_image_translation --display-name "Python 06_image_translation"
 
 # %% [markdown]
 """
@@ -126,12 +126,13 @@ util.set_seed(42)
 translation_task = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
 opt.name = "dlmbl_vsnuclei"
 # Path to store all the logs.
-top_dir = Path(f"~/data/06_image_translation/part2/").expanduser() # TODO: Change this to point to your data directory.
+top_dir = Path("mnt/efs/dlmbl")
+top_dir = top_dir/Path(f"data/06_image_translation/part2")
 opt.checkpoints_dir = top_dir/"GAN_code/GANs_MI2I/new_training_runs/"
 Path(f'{opt.checkpoints_dir}/{opt.name}').mkdir(parents=True, exist_ok=True)
 output_image_folder = top_dir/"tiff_files/"
 # Initalize the tensorboard writer.
-writer = SummaryWriter(log_dir=opt.checkpoints_dir)
+writer = SummaryWriter(log_dir=f'{opt.checkpoints_dir}/{opt.name}')
 # %% [markdown]
 """
 ## 1.1 Load Dataset & Configure Dataloaders.<br>
@@ -148,7 +149,7 @@ opt.input_nc = 1  # Number of input channels.
 opt.output_nc = 1  # Number of output channels.
 opt.resize_or_crop = "none"  # Scaling and cropping of images at load time [resize_and_crop|crop|scale_width|scale_width_and_crop|none].
 opt.target = "nuclei"  # or "cyto" depending on your choice of target for virtual stain.
-
+opt.batchSize = 16
 # Load Training Set for input into model
 opt.isTrain = True 
 train_dataloader = CreateDataLoader(opt)
@@ -186,8 +187,6 @@ opt.ndf = 32  # Number of filters in the discriminator.
 opt.gpu_ids = [0] # GPU ids to use.
 opt.norm = "instance"  # Normalization layer in the generator.
 opt.use_dropout = ""  # Use dropout in the generator (fixed at 0.2).
-opt.batchSize = 16  # Batch size.
-
 # Create a visualizer to perform image processing and visualization
 visualizer = Visualizer(opt)
 
@@ -236,13 +235,13 @@ train_model(
 
 ## A heads up of what to expect from the training...
 <br><br>
-**- Visualise results**: We can observe how the performance improves over time using the images tab and the sliding window.
+<br>- Visualise results<br>: We can observe how the performance improves over time using the images tab and the sliding window.
 <br><br>
 **- Discriminator Predicted Probabilities**: We plot the discriminator's predicted probabilities that the phase with fluorescence is phase and fluorescence and that the phase with virtual stain is phase with virtual stain. It is typically trained until the discriminator can no longer classify whether or not the generated images are real or fake better than a random guess (p(0.5)). We plot this for both the training and validation datasets.
 <br><br>
-**- Adversarial Loss**: We can formulate the adversarial loss as a Least Squared Error Loss in which for real data the discriminator should output a value close to 1 and for fake data a value close to 0. The generator's goal is to make the discriminator output a value as close to 1 for fake data. We plot the least squared error loss.
+<br>- Adversarial Loss<br>: We can formulate the adversarial loss as a Least Squared Error Loss in which for real data the discriminator should output a value close to 1 and for fake data a value close to 0. The generator's goal is to make the discriminator output a value as close to 1 for fake data. We plot the least squared error loss.
 <br><br>
-**- Feature Matching Loss**: Both networks are also trained using the generator feature matching loss which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.
+<br>- Feature Matching Loss<br>: Both networks are also trained using the generator feature matching loss which encourages the generator to produce images that contain similar statistics to the real images at each scale. We also plot the feature matching L1 loss for the training and validation sets together to observe the performance and how the model is fitting the data.
 <br><br>
 This implementation allows for the turning on/off of the least-square loss term by setting the opt.no_lsgan flag to the model options. As well as the turning off of the feature matching loss term by setting the opt.no_ganFeat_loss flag to the model options. Something you might want to explore in the next section!<br><br>
 </div>
@@ -275,22 +274,10 @@ log_dir = f"{top_dir}/model_tensorboard/{opt.name}/"
 %reload_ext tensorboard
 %tensorboard --logdir $log_dir
 
-# %% [markdown]
-"""
-## Training Results
-Please note down your thoughts about the following questions...
-
-**- What do you notice about the virtual staining predictions? How do they appear compared to the regression-based approach? Can you spot any hallucinations?**<br><br> 
-**- What do you notice about the probabilities of the discriminators? How do the values compare during training compared to validation?**<br><br>
-**- What do you notice about the feature matching L1 loss?**<br><br>
-**- What do you notice about the least-square loss?**<br><br>
-
-"""
 
 # %% [markdown]
 """
 <div class="alert alert-success">
-    
 ## Checkpoint 2
 Congratulations! You should now have a better understanding the different loss components of Pix2PixHD GAN and how they are used to train the model. You should also have a good understanding of the fit of the model during training on the training and validation datasets.
 
