@@ -1881,7 +1881,42 @@ with torch.inference_mode():
 pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
 ax[2, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
 ax[2, 1].imshow(pred_composite[0])
-ax[2,0].set_title('Gaussian Blur Sigma=2')
+
+#%% tags=["solution"]
+#%% tags=["task"]
+n = 3
+y_slice = slice(Y//2, Y//2+256*n)
+x_slice = slice(X//2, X//2+256*n)
+f, ax = plt.subplots(3, 2, figsize=(8, 12))
+
+target_composite = composite_nuc_mem(batch["target"][0].cpu().numpy(), GREEN, MAGENTA)
+ax[0, 0].imshow(
+    batch["source"][0, 0, 0,y_slice,x_slice].cpu().numpy(), cmap="gray", vmin=-15, vmax=15
+)
+ax[0, 1].imshow(clip_highlight(target_composite[0,y_slice,x_slice]))
+ax[0,0].set_title('Source and target')
+
+# no perturbation
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[1, 0].imshow(phase[0,0,0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[1, 1].imshow(pred_composite[0])
+ax[1,0].set_title('No perturbation')
+
+
+# 2-sigma gaussian blur
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    # ########## SOLUTION ##############
+    # Hint: Scale the phase intensity 
+    phase = phase * 10
+    # #######################
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[2, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[2, 1].imshow(pred_composite[0])
 
 #%% [markdown]
 # ########## TODO ##############
