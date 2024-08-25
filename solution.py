@@ -514,7 +514,7 @@ target_channel = ["TODO", "TODO"]
 augmentations = [
     RandWeightedCropd(
         keys=source_channel + target_channel,
-        spatial_size=(1, 256, 256),
+        spatial_size=(1, 384, 384),
         num_samples=2,
         w_key=target_channel[0],
     ),
