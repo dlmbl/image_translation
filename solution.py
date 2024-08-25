@@ -386,7 +386,7 @@ BATCH_SIZE = 4
 # #######################
 # ##### TODO ########
 # #######################
-# HINT: Run dataset.channel_names 
+# HINT: Run dataset.channel_names
 source_channel = ["TODO"]
 target_channel = ["TODO", "TODO"]
 
@@ -548,7 +548,7 @@ normalizations = [
         level="fov_statistics",
         subtrahend="median",
         divisor="iqr",
-    )
+    ),
 ]
 
 data_module.augmentations = augmentations
@@ -925,6 +925,26 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 #phase2fluor_model_ckpt = natsorted(glob(
 #  str(top_dir/"06_image_translation/backup/phase2fluor/version_0/checkpoints/*.ckpt")
 #))[-1]
+#```
+
+#```python
+#phase2fluor_config = dict(
+#     in_channels=1,
+#     out_channels=2,
+#     encoder_blocks=[3, 3, 9, 3],
+#     dims=[96, 192, 384, 768],
+#     decoder_conv_blocks=2,
+#     stem_kernel_size=(1, 2, 2),
+#     in_stack_depth=1,
+#     pretraining=False,
+# )
+# Load the model checkpoint
+# phase2fluor_model = VSUNet.load_from_checkpoint(
+#     phase2fluor_model_ckpt,
+#     architecture="UNeXt2_2D",
+#     model_config = phase2fluor_config,
+#     accelerator='gpu'
+# )
 #````
 # </div>
 # %%
@@ -1028,8 +1048,14 @@ for i, sample in enumerate(test_data.test_dataloader()):
     target_membrane = process_image(target_image[1,0])
        # Concatenate all images side by side
     combined_image = np.concatenate(
-        (phase_raw, predicted_nuclei, predicted_membrane, target_nuclei, target_membrane),
-        axis=1
+        (
+            phase_raw, 
+            predicted_nuclei,
+            predicted_membrane,
+            target_nuclei,
+            target_membrane
+        ),
+        axis=1,
     )
 
     # Plot the phase,target nuclei, target membrane, predicted nuclei, predicted membrane
@@ -1065,7 +1091,7 @@ for i, sample in enumerate(test_data.test_dataloader()):
 pretrained_model_ckpt = top_dir/...## Add the path to the "VSCyto2D/epoch=399-step=23200.ckpt"
 
 # TODO: Load the phase2fluor_config just like the model you trained
-phase2fluor_config = dict() ##
+phase2fluor_config = dict()  ##
 
 # TODO: Load the checkpoint. Write the architecture name. HINT: look at the previous config.
 pretrained_phase2fluor = VSUNet.load_from_checkpoint(
@@ -1536,13 +1562,15 @@ Script to visualize the encoder feature maps of a trained model.
 Using PCA to visualize feature maps is inspired by
 https://doi.org/10.48550/arXiv.2304.07193 (Oquab et al., 2023).
 """
+from typing import NamedTuple
+
 from matplotlib.patches import Rectangle
+from monai.networks.layers import GaussianFilter
 from skimage.exposure import rescale_intensity
 from skimage.transform import downscale_local_mean
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-from typing import NamedTuple
-from monai.networks.layers import GaussianFilter
+
 
 def feature_map_pca(feature_map: np.array, n_components: int = 8) -> PCA:
     """
