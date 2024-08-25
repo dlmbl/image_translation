@@ -868,6 +868,9 @@ trainer = VSTrainer(
 # Launch training and check that loss and images are being logged on tensorboard.
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 
+# Move the model to the GPU.
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+phase2fluor_model.to(device)
 # %% [markdown] tags=[]
 # <div class="alert alert-success">
 
@@ -1110,8 +1113,11 @@ phase2fluor_config = dict()  ##
 pretrained_phase2fluor = VSUNet.load_from_checkpoint(
     pretrained_model_ckpt,
     architecture=...,
-    module_config=phase2fluor_config,
+    model_config=phase2fluor_config,
+    accelerator='gpu'
 )
+# TODO: Setup the dataloader in evaluation/predict mode
+#
 
 # %% tags=["solution"]
 # #######################
@@ -1137,6 +1143,7 @@ pretrained_phase2fluor = VSUNet.load_from_checkpoint(
     pretrained_model_ckpt,
     architecture="UNeXt2_2D",
     model_config = phase2fluor_config,
+    accelerator='gpu'
 )
 pretrained_phase2fluor.eval()
 
