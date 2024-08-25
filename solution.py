@@ -1958,11 +1958,11 @@ ax[1, 1].imshow(pred_composite[0])
 ax[1,0].set_title('No perturbation')
 
 
-# 2-sigma gaussian blur
+# Rescale the pixel value up/down
 with torch.inference_mode():
     phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
     # ########## TODO ##############
-    # Hint: Scale the phase intensity 
+    # Hint: Scale the phase intensity up/down until the model breaks
     phase = phase * ......
     # #######################
     pred = model(phase).cpu().numpy()
@@ -1993,11 +1993,11 @@ ax[1, 1].imshow(pred_composite[0])
 ax[1,0].set_title('No perturbation')
 
 
-# 2-sigma gaussian blur
+# Rescale the pixel value up/down
 with torch.inference_mode():
     phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
     # ########## SOLUTION ##############
-    # Hint: Scale the phase intensity 
+    # Hint: Scale the phase intensity up/down until the model breaks
     phase = phase * 10
     # #######################
     pred = model(phase).cpu().numpy()
