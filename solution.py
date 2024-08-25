@@ -518,8 +518,25 @@ augmentations = [
         num_samples=2,
         w_key=target_channel[0],
     ),
+    # #######################
+    # ##### TODO  ########
+    # #######################
+    ## TODO: Add Random Affine Transorms
+    ## Write code below
+    
+
+    # #######################
     RandAdjustContrastd(keys=source_channel, prob=0.5, gamma=(0.8, 1.2)),
     RandScaleIntensityd(keys=source_channel, factors=0.5, prob=0.5),
+    # #######################
+    # ##### TODO  ########
+    # #######################
+    ## TODO: Add Random Gaussian Noise
+    ## Write code below
+    
+
+    
+    # #######################
     RandGaussianSmoothd(
         keys=source_channel,
         sigma_x=(0.25, 0.75),
@@ -527,13 +544,6 @@ augmentations = [
         sigma_z=(0.0, 0.0),
         prob=0.5,
     ),
-    # #######################
-    # ##### TODO  ########
-    # #######################
-    ## TODO: Add Random Affine Transorms
-    ## Write code below
-    ## TODO: Add Random Gaussian Noise
-    ## Write code below
 ]
 
 normalizations = [
@@ -754,9 +764,10 @@ phase2fluor_model = VSUNet(
     freeze_encoder=False,
 )
 
-# %% [markdown] tags=[]
 # ### Instantiate data module and trainer, test that we are setup to launch training.
-# %%
+# #######################
+# ##### SOLUTION ########
+# #######################
 # Selecting the source and target channel names from the dataset.
 source_channel = ["Phase3D"]
 target_channel = ["Nucl", "Mem"]
@@ -774,13 +785,15 @@ phase2fluor_2D_data = HCSDataModule(
     augmentations=augmentations,
     normalizations=normalizations,
 )
+# #######################
+# ##### SOLUTION ########
+# #######################
 phase2fluor_2D_data.setup("fit")
 # fast_dev_run runs a single batch of data through the model to check for errors.
 trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID],precision='16-mixed', fast_dev_run=True)
 
 # trainer class takes the model and the data module as inputs.
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
-
 
 # %% [markdown] tags=[]
 # ## View model graph.
