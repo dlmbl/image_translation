@@ -1,5 +1,5 @@
 # %% [markdown] tags=[]
-# # Image translation (Virtual Staining) - Part 1
+# # Image translation (Virtual Staining)
 
 # Written by Eduardo Hirata-Miyasaki, Ziwen Liu, and Shalin Mehta, CZ Biohub San Francisco
 
@@ -115,19 +115,19 @@ seed_everything(42, workers=True)
 
 # Paths to data and log directory
 top_dir = Path(
-    "/mnt/efs/dlmbl/data/"
+    "/mnt/efs/dlmbl/share/"
 )  # If this fails, make sure this to point to your data directory in the shared mounting point inside /dlmbl/data
 
 # Path to the training data
 data_path = (
-    top_dir / "06_image_translation/part1/training/a549_hoechst_cellmask_train_val.zarr"
+    top_dir / "06_image_translation/training/a549_hoechst_cellmask_train_val.zarr"
 )
 
 # Path where we will save our training logs
-training_top_dir = Path(f"{os.environ['HOME']}/data/")
+training_top_dir = Path(f"{os.getcwd()}/data/")
 # Create top_training_dir directory if needed, and launch tensorboard
 training_top_dir.mkdir(parents=True, exist_ok=True)
-log_dir = training_top_dir / "06_image_translation/part1/logs/"
+log_dir = training_top_dir / "06_image_translation/logs/"
 # Create log directory if needed, and launch tensorboard
 log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -221,7 +221,7 @@ dataset = open_ome_zarr(data_path)
 # Check the cell density, the cell morphologies, and fluorescence signal.
 # HINT: look at the HCS Plate format to see what are your options.
 # </div>
-# %%tags=["task"]
+# %% tags=[]
 # Use the field and pyramid_level below to visualize data.
 row = 0
 col = 0
@@ -255,8 +255,8 @@ plt.tight_layout()
 # VisCy builds on top of PyTorch Lightning. PyTorch Lightning is a thin wrapper around PyTorch that allows rapid experimentation. It provides a [DataModule](https://lightning.ai/docs/pytorch/stable/data/datamodule.html) to handle loading and processing of data during training. VisCy provides a child class, `HCSDataModule` to make it intuitve to access data stored in the HCS layout.
 
 # The dataloader in `HCSDataModule` returns a batch of samples. A `batch` is a list of dictionaries. The length of the list is equal to the batch size. Each dictionary consists of following key-value pairs.
-# - `source`: the input image, a tensor of size 1*1*Y*X
-# - `target`: the target image, a tensor of size 2*1*Y*X
+# - `source`: the input image, a tensor of size `(1, 1, Y, X)`
+# - `target`: the target image, a tensor of size `(2, 1, Y, X)`
 # - `index` : the tuple of (location of field in HCS layout, time, and z-slice) of the sample.
 
 # %% [markdown] tags=[]
@@ -616,8 +616,7 @@ log_batch_jupyter(augmented_batch)
 
 # %% [markdown] tags=[]
 # ## Train a 2D U-Net model to predict nuclei and membrane from phase.
-
-### Constructing a 2D UNeXt2 using VisCy
+# ### Constructing a 2D UNeXt2 using VisCy
 # %% [markdown]
 # <div class="alert alert-info">
 #
@@ -883,13 +882,13 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 
 # %% [markdown] tags=[]
 # ### Let's compute metrics directly and plot below.
-#%% [markdown] tags=[]
+# %% [markdown] tags=[]
 # <div class="alert alert-danger">
 # If you weren't able to train or training didn't complete please run the following lines to load the latest checkpoint <br>
 # 
 # ```python
 # phase2fluor_model_ckpt = natsorted(glob(
-#    str(top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
+#    str(top_dir / "06_image_translation/logs/phase2fluor/version*/checkpoints/*.ckpt")
 # ))[-1]
 #```
 #<br>
@@ -904,7 +903,7 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 # </div>
 # %%
 # Setup the test data module.
-test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
+test_data_path = top_dir / "06_image_translation/test/a549_hoechst_cellmask_test.zarr"
 source_channel = ["Phase3D"]
 target_channel = ["Nucl", "Mem"]
 
@@ -923,7 +922,7 @@ test_metrics = pd.DataFrame(
     columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
 )
 
-#%%
+# %%
 # Compute metrics directly and plot here.
 def normalize_fov(input:ArrayLike):
     "Normalizing the fov with zero mean and unit variance"
@@ -966,7 +965,7 @@ test_metrics.boxplot(
     rot=30,
 )
 
-#%%
+# %%
 # Adjust the image to the 0.5-99.5 percentile range.
 def process_image(image):
     p_low, p_high = np.percentile(image, (0.5, 99.5))
@@ -1023,7 +1022,7 @@ for i, sample in enumerate(test_data.test_dataloader()):
 # Here we will compare your model with the VSCyto2D pretrained model by computing the pixel-based metrics and segmentation-based metrics.
 #
 # <ul>
-# <li>When you ran the `setup.sh` you also downloaded the models in `/06_image_translation/part1/pretrained_models/VSCyto2D/*.ckpt`</li>
+# <li>When you ran the `setup.sh` you also downloaded the models in `/06_image_translation/pretrained_models/VSCyto2D/*.ckpt`</li>
 # <li>Load the <b>VSCyto2 model</b> model checkpoint and the configuration file</li>
 # <li>Compute the pixel-based metrics and segmentation-based metrics between the model you trained and the pretrained model</li>
 # </ul>
@@ -1055,7 +1054,7 @@ pretrained_phase2fluor = VSUNet.load_from_checkpoint(
 # #######################
 
 pretrained_model_ckpt = (
-    top_dir / "06_image_translation/part1/pretrained_models/VSCyto2D/epoch=399-step=23200.ckpt"
+    top_dir / "06_image_translation/pretrained_models/VSCyto2D/epoch=399-step=23200.ckpt"
 )
 
 phase2fluor_config = dict(
@@ -1079,7 +1078,7 @@ pretrained_phase2fluor.eval()
 ### Re-load your trained model
 # NOTE: assuming the latest checkpoint it your latest training and model
 phase2fluor_model_ckpt = natsorted(glob(
-    str(training_top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
+    str(training_top_dir / "06_image_translation/logs/phase2fluor/version*/checkpoints/*.ckpt")
 ))[-1]
 
 # NOTE: if their model didn't go past epoch 5, lost their checkpoint, or didnt train anything. 
@@ -1107,7 +1106,7 @@ phase2fluor_model = VSUNet.load_from_checkpoint(
     accelerator='gpu'
 )
 phase2fluor_model.eval()
-#%% [markdown] tags=[]
+# %% [markdown] tags=[]
 # <div class="alert alert-warning">
 # <h3> Question </h3> 
 # 1. Can we evaluate a model's performance based on their segmentations?<br>
@@ -1115,7 +1114,7 @@ phase2fluor_model.eval()
 # We will evaluate the performance of your trained model with a pre-trained model using pixel based metrics as above and
 # segmantation based metrics including (mAP@0.5, dice, accuracy and jaccard index). <br>
 # </div>
-#%% [markdown] tags=["solution"]
+# %% [markdown] tags=["solution"]
 #
 # - <b> IoU (Intersection over Union): </b> Also referred to as the Jaccard index, is essentially a method to quantify the percent overlap between the target and predicted masks. 
 # It is calculated as the intersection of the target and predicted masks divided by the union of the target and predicted masks. <br>
@@ -1162,8 +1161,8 @@ def cellpose_segmentation(prediction:ArrayLike,target:ArrayLike)->Tuple[torch.Sh
 
 # %%
 # Setting the paths for the test data and the output segmentation
-test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
-output_segmentation_path= training_top_dir /"06_image_translation/part1/pretrained_model_segmentations.zarr"
+test_data_path = top_dir / "06_image_translation/test/a549_hoechst_cellmask_test.zarr"
+output_segmentation_path= training_top_dir /"06_image_translation/pretrained_model_segmentations.zarr"
 
 # Creating the dataframes to store the pixel and segmentation metrics
 test_pixel_metrics = pd.DataFrame(
@@ -1359,8 +1358,8 @@ test_dataset.close()
 segmentation_store.close()
 # %%
 # Save the test metrics into a dataframe
-pixel_metrics_path = training_top_dir/"06_image_translation/part1/VS_metrics_pixel_part_1.csv"
-segmentation_metrics_path = training_top_dir/"06_image_translation/part1/VS_metrics_segments_part_1.csv"
+pixel_metrics_path = training_top_dir/"06_image_translation/VS_metrics_pixel.csv"
+segmentation_metrics_path = training_top_dir/"06_image_translation/VS_metrics_segments.csv"
 test_pixel_metrics.to_csv(pixel_metrics_path)
 test_segmentation_metrics.to_csv(segmentation_metrics_path)
 
@@ -1402,18 +1401,24 @@ plt.suptitle("Model Segmentation Metrics")
 plt.show()
 
 # %% [markdown] tags=["task"]
-# ########## TODO ##############
-# - What do these metrics tells us about the performance of the model?
-# - How do you interpret the differences in the metrics between the models?
-# - How is your model compared to the pretrained model? How can you improve it?
+# <div class="alert alert-warning">
+# <h3>Questions</h3>
+# <ul>
+# <li> What do these metrics tells us about the performance of the model? </li>
+# <li> How do you interpret the differences in the metrics between the models? </li>
+# <li> How is your model compared to the pretrained model? How can you improve it? </li>
+# </ul>
+# </div>
 
 # %% [markdown]
 # <div class="alert alert-info">
 #
 # ### Plotting the predictions and segmentations
 # Here we will plot the predictions and segmentations side by side for the pretrained and trained models.<br>
-# - How do yout model, the pretrained model and the ground truth compare?<br>
-# - How do the segmentations compare? <br>
+# <ul>
+# <li>How do yout model, the pretrained model and the ground truth compare?</li>
+# <li>How do the segmentations compare? </li>
+# </ul>
 # Feel free to modify the crop size and Y,X slicing to view different areas of the FOV
 # </div>
 # %% tags=["task"]
@@ -1483,7 +1488,7 @@ plt.show()
 # 
 # </div>
 
-# %%[markdown] tags=[]
+# %% [markdown] tags=[]
 # <div class="alert alert-info">
 # <h3> Task 3.1: Let's look at what the model is learning </h3>
 # 
@@ -1494,7 +1499,7 @@ plt.show()
 # 
 # </div>
 
-#%%
+# %%
 """
 Script to visualize the encoder feature maps of a trained model.
 Using PCA to visualize feature maps is inspired by
@@ -1527,16 +1532,16 @@ def pcs_to_rgb(feat: np.ndarray, n_components: int = 8) -> np.ndarray:
     return np.stack(
         [rescale_intensity(pc, out_range=(0, 1)) for pc in pc_first_3], axis=-1
     )
-#%%
+# %%
 # Load the test dataset
-test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
+test_data_path = top_dir / "06_image_translation/test/a549_hoechst_cellmask_test.zarr"
 test_dataset = open_ome_zarr(test_data_path)
 
 # Looking at the test dataset
 print('Test dataset:')
 test_dataset.print_tree()
 
-#%% [markdown] tags=[]
+# %% [markdown] tags=[]
 # <div class="alert alert-info">
 #
 # - Change the `fov` and `crop` size to visualize the feature maps of the encoder and decoder  <br>
@@ -1566,18 +1571,16 @@ fluo = test_dataset[f"0/0/{fov}/0"][0, 1:3, 0, Y//2 - crop // 2 : Y//2 + crop //
 phase_img = (phase_img - norm_meta["median"]) / norm_meta["iqr"]
 plt.imshow(phase_img[0,0,0], cmap="gray")
 
-# %%
-#%% [markdown] tags=[]
+# %% [markdown] tags=[]
 # <div class="alert alert-info">
-#
-# - For the following tasks we will use the pretrained model to extract the encoder and decoder features <br>
-# - Extra: If you are done with the whole checkpoint, you can try to look at what your trained model learned.
+# For the following tasks we will use the pretrained model to extract the encoder and decoder features <br>
+# Extra: If you are done with the whole checkpoint, you can try to look at what your trained model learned.
 # </div>
-#%%
+# %%
 
 # Loading the pretrained model
 pretrained_model_ckpt = (
-    top_dir / "06_image_translation/part1/pretrained_models/VSCyto2D/epoch=399-step=23200.ckpt"
+    top_dir / "06_image_translation/pretrained_models/VSCyto2D/epoch=399-step=23200.ckpt"
 )
 # model config as before
 phase2fluor_config = dict(
@@ -1715,9 +1718,9 @@ phase2fluor_2D_data = HCSDataModule(
     normalizations=normalizations,
 )
 phase2fluor_2D_data.setup("test")
-#%% tags=["task"]
+# %% tags=[]
 # ########## TODO ##############
-batch_number= 3
+batch_number = 3 # Change this to see different batches of data
 # #######################
 y_slice = slice(Y//2-256*n//2, Y//2+256*n//2)
 x_slice = slice(X//2-256*n//2, X//2+256*n//2)
@@ -1752,7 +1755,7 @@ plt.show()
 # - Plot the source and predicted images comparing the source, target and added perturbations <br>
 # - How is the model's predictions given the perturbations? <br>
 # </div>
-#%% tags=["task"]
+# %% tags=["task"]
 # ########## TODO ##############
 # Try out different multiples of 256 to visualize larger/smaller crops
 n = 3
@@ -1794,7 +1797,7 @@ pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
 ax[2, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
 ax[2, 1].imshow(pred_composite[0])
 
-#%% tags=["solution"]
+# %% tags=["solution"]
 # ########## SOLUTION ##############
 # Try out different multiples of 256 to visualize larger/smaller crops
 n = 3
@@ -1847,7 +1850,7 @@ ax[2, 1].imshow(pred_composite[0])
 # - How is the model's predictions given the perturbations? <br>
 # </div>
 
-#%% tags=["task"]
+# %% tags=["task"]
 n = 3
 y_slice = slice(Y//2, Y//2+256*n)
 x_slice = slice(X//2, X//2+256*n)
@@ -1882,8 +1885,7 @@ pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
 ax[2, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
 ax[2, 1].imshow(pred_composite[0])
 
-#%% tags=["solution"]
-#%% tags=["task"]
+# %% tags=["solution"]
 n = 3
 y_slice = slice(Y//2, Y//2+256*n)
 x_slice = slice(X//2, X//2+256*n)
@@ -1918,12 +1920,13 @@ pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
 ax[2, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
 ax[2, 1].imshow(pred_composite[0])
 
-#%% [markdown]
-# ########## TODO ##############
-# - How is the model's predictions given the blurring and scaling perturbations? <br>
+# %% [markdown]
+# <div class="alert alert-warning">
+# <h3> Questions </h3>
+# How is the model's predictions given the blurring and scaling perturbations? <br>
+# </div>
 
-
-#%% tags=["solution"]
+# %% tags=["solution"]
 # ########## SOLUTIONS FOR ALL POSSIBLE PLOTTINGS ##############
 # This plots all perturbations
 
@@ -2007,4 +2010,3 @@ f.tight_layout()
 # Congratulations! You have trained an image translation model, evaluated its performance, and explored what the network has learned. 
 
 # </div>
-# %%

@@ -17,7 +17,7 @@ $ENV_PATH/bin/pip install "viscy[metrics,visual]==0.2.0rc1"
 $ENV_PATH/bin/pip install "jupyterlab"
 
 # Create the directory structure
-output_dir=/mnt/efs/dlmbl
+# output_dir=/mnt/efs/dlmbl
 # Assuming that we ran the setup_TA.sh that downloads the data to nfs shared storage
 # Creating the simlink to the NFS partition
 # ln -s "$output_dir"/data ~/data
