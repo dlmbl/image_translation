@@ -1,58 +1,68 @@
 # %% [markdown] tags=[]
-# # Image translation (Virtual Staining) - Part 1
+# # Image translation (Virtual Staining)
 
 # Written by Eduardo Hirata-Miyasaki, Ziwen Liu, and Shalin Mehta, CZ Biohub San Francisco
 
 # ## Overview
-
-# In this exercise, we will predict fluorescence images of
-# nuclei and plasma membrane markers from quantitative phase images of cells,
-# i.e., we will _virtually stain_ the nuclei and plasma membrane
-# visible in the phase image.
-# This is an example of an image translation task.
-# We will apply spatial and intensity augmentations to train robust models
-# and evaluate their performance using a regression approach.
-
+#
+# In this exercise, we will _virtually stain_ the nuclei and plasma membrane from the quantitative phase image (QPI), i.e., translate QPI images into fluoresence images of nuclei and plasma membranes.
+# QPI encodes multiple cellular structures and virtual staining decomposes these structures. After the model is trained, one only needs to acquire label-free QPI data.
+# This strategy solves the problem as "multi-spectral imaging", but is more compatible with live cell imaging and high-throughput screening.
+# Virtual staining is often a step towards multiple downstream analyses: segmentation, tracking, and cell state phenotyping.
+# 
+# In this exercise, you will:
+# - Train a model to predict the fluorescence images of nuclei and plasma membranes from QPI images
+# - Make it robust to variations in imaging conditions using data augmentions
+# - Segment the cells
+# - Use regression and segmentation metrics to evalute the models
+# - Visualize the image transform learned by the model
+# - Understand the failure modes of the trained model
+#
 # [![HEK293T](https://raw.githubusercontent.com/mehta-lab/VisCy/main/docs/figures/svideo_1.png)](https://github.com/mehta-lab/VisCy/assets/67518483/d53a81eb-eb37-44f3-b522-8bd7bddc7755)
 # (Click on image to play video)
-
+#
 # %% [markdown] tags=[]
 # ### Goals
 
-# #### Part 1: Learn to use iohub (I/O library), VisCy dataloaders, and TensorBoard.
-
-#   - Use a OME-Zarr dataset of 34 FOVs of adenocarcinomic human alveolar basal epithelial cells (A549),
-#   each FOV has 3 channels (phase, nuclei, and cell membrane).
-#   The nuclei were stained with DAPI and the cell membrane with Cellmask.
+# #### Part 1: Train a virtual staining model
+#
 #   - Explore OME-Zarr using [iohub](https://czbiohub-sf.github.io/iohub/main/index.html)
 #   and the high-content-screen (HCS) format.
-#   - Use [MONAI](https://monai.io/) to implement data augmentations.
-
-# #### Part 2: Train and evaluate the model to translate phase into fluorescence.
-#   - Train a 2D UNeXt2 model to predict nuclei and membrane from phase images.
-#   - Compare the performance of the trained model and a pre-trained model.
+#   - Use our `viscy.data.HCSDataloader()` dataloader and explore the  3 channel (phase, fluoresecence nuclei and cell membrane) 
+#   A549 cell dataset. 
+#   - Implement data augmentations [MONAI](https://monai.io/) to train a robust model to imaging parameters and conditions. 
+#   - Use tensorboard to log the augmentations, training and validation losses and batches
+#   - Start the training of the UNeXt2 model to predict nuclei and membrane from phase images.
+#
+# #### Part 2:Evaluate the model to translate phase into fluorescence.
+#   - Compare the performance of your trained model with the _VSCyto2D_ pre-trained model.
 #   - Evaluate the model using pixel-level and instance-level metrics.
-
-
-# Checkout [VisCy](https://github.com/mehta-lab/VisCy/tree/main/examples/demos),
+#
+# #### Part 3: Visualize the image transforms learned by the model and explore the model's regime of validity
+#   - Visualize the first 3 principal componets mapped to a color space in each encoder and decoder block.
+#   - Explore the model's regime of validity by applying blurring and scaling transforms to the input phase image.
+#
+# #### For more information:
+# Checkout [VisCy](https://github.com/mehta-lab/VisCy),
 # our deep learning pipeline for training and deploying computer vision models
 # for image-based phenotyping including the robust virtual staining of landmark organelles.
+#
 # VisCy exploits recent advances in data and metadata formats
 # ([OME-zarr](https://www.nature.com/articles/s41592-021-01326-w)) and DL frameworks,
 # [PyTorch Lightning](https://lightning.ai/) and [MONAI](https://monai.io/).
 
 # ### References
-
 # - [Liu, Z. and Hirata-Miyasaki, E. et al. (2024) Robust Virtual Staining of Cellular Landmarks](https://www.biorxiv.org/content/10.1101/2024.05.31.596901v2.full.pdf)
 # - [Guo et al. (2020) Revealing architectural order with quantitative label-free imaging and deep learning. eLife](https://elifesciences.org/articles/55502)
 
 # %% [markdown] tags=[]
-# <div class="alert alert-info">
-# The exercise is organized in 2 parts
+# <div class="alert alert-success">
+# The exercise is organized in 3 parts:
 
 # <ul>
-# <li><b>Part 1</b> - Learn to use iohub (I/O library), VisCy dataloaders, and tensorboard.</li>
-# <li><b>Part 2</b> - Train and evaluate the model to translate phase into fluorescence.</li>
+# <li><b>Part 1</b> - Train a virtual staining model using iohub (I/O library), VisCy dataloaders, and tensorboard</li>
+# <li><b>Part 2</b> - Evaluate the model to translate phase into fluorescence.</li>
+# <li><b>Part 3</b> - Visualize the image transforms learned by the model and explore the model's regime of validity.</li>
 # </ul>
 
 # </div>
@@ -62,7 +72,7 @@
 # Set your python kernel to <span style="color:black;">06_image_translation</span>
 # </div>
 # %% [markdown]
-# ## Part 1: Log training data to tensorboard, start training a model.
+# # Part 1: Log training data to tensorboard, start training a model.
 # ---------
 # Learning goals:
 
@@ -115,19 +125,19 @@ seed_everything(42, workers=True)
 
 # Paths to data and log directory
 top_dir = Path(
-    "/mnt/efs/dlmbl/data/"
+    "/mnt/efs/dlmbl/share/"
 )  # If this fails, make sure this to point to your data directory in the shared mounting point inside /dlmbl/data
 
 # Path to the training data
 data_path = (
-    top_dir / "06_image_translation/part1/training/a549_hoechst_cellmask_train_val.zarr"
+    top_dir / "06_image_translation/training/a549_hoechst_cellmask_train_val.zarr"
 )
 
 # Path where we will save our training logs
-training_top_dir = Path(f"{os.environ['HOME']}/data/")
+training_top_dir = Path(f"{os.getcwd()}/data/")
 # Create top_training_dir directory if needed, and launch tensorboard
 training_top_dir.mkdir(parents=True, exist_ok=True)
-log_dir = training_top_dir / "06_image_translation/part1/logs/"
+log_dir = training_top_dir / "06_image_translation/logs/"
 # Create log directory if needed, and launch tensorboard
 log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -188,12 +198,14 @@ tensorboard_process = launch_tensorboard(log_dir)
 # ## Load OME-Zarr Dataset
 
 # There should be 34 FOVs in the dataset.
-
+#
 # Each FOV consists of 3 channels of 2048x2048 images,
 # saved in the [High-Content Screening (HCS) layout](https://ngff.openmicroscopy.org/latest/#hcs-layout)
 # specified by the Open Microscopy Environment Next Generation File Format
 # (OME-NGFF).
-
+#
+# The 3 channels correspond to the QPI, nuclei, and cell membrane. The nuclei were stained with DAPI and the cell membrane with Cellmask.
+#
 # - The layout on the disk is: `row/col/field/pyramid_level/timepoint/channel/z/y/x.`
 # - These datasets only have 1 level in the pyramid (highest resolution) which is '0'.
 
@@ -221,7 +233,7 @@ dataset = open_ome_zarr(data_path)
 # Check the cell density, the cell morphologies, and fluorescence signal.
 # HINT: look at the HCS Plate format to see what are your options.
 # </div>
-# %%tags=["task"]
+# %% tags=[]
 # Use the field and pyramid_level below to visualize data.
 row = 0
 col = 0
@@ -255,8 +267,8 @@ plt.tight_layout()
 # VisCy builds on top of PyTorch Lightning. PyTorch Lightning is a thin wrapper around PyTorch that allows rapid experimentation. It provides a [DataModule](https://lightning.ai/docs/pytorch/stable/data/datamodule.html) to handle loading and processing of data during training. VisCy provides a child class, `HCSDataModule` to make it intuitve to access data stored in the HCS layout.
 
 # The dataloader in `HCSDataModule` returns a batch of samples. A `batch` is a list of dictionaries. The length of the list is equal to the batch size. Each dictionary consists of following key-value pairs.
-# - `source`: the input image, a tensor of size 1*1*Y*X
-# - `target`: the target image, a tensor of size 2*1*Y*X
+# - `source`: the input image, a tensor of size `(1, 1, Y, X)`
+# - `target`: the target image, a tensor of size `(2, 1, Y, X)`
 # - `index` : the tuple of (location of field in HCS layout, time, and z-slice) of the sample.
 
 # %% [markdown] tags=[]
@@ -344,6 +356,7 @@ def log_batch_jupyter(batch):
     p1, p99 = np.percentile(batch_phase, (0.1, 99.9))
     batch_phase = np.clip((batch_phase - p1) / (p99 - p1), 0, 1)
 
+    n_channels = batch["target"].shape[1] + batch["source"].shape[1]
     plt.figure()
     fig, axes = plt.subplots(
         batch_size, n_channels, figsize=(n_channels * 2, batch_size * 2)
@@ -373,7 +386,7 @@ BATCH_SIZE = 4
 # #######################
 # ##### TODO ########
 # #######################
-# HINT: Run dataset.channel_names 
+# HINT: Run dataset.channel_names
 source_channel = ["TODO"]
 target_channel = ["TODO", "TODO"]
 
@@ -525,11 +538,17 @@ augmentations = [
 
 normalizations = [
     NormalizeSampled(
-        keys=source_channel + target_channel,
+        keys=source_channel,
         level="fov_statistics",
         subtrahend="mean",
         divisor="std",
-    )
+    ),
+    NormalizeSampled(
+        keys=target_channel,
+        level="fov_statistics",
+        subtrahend="median",
+        divisor="iqr",
+    ),
 ]
 
 data_module.augmentations = augmentations
@@ -580,10 +599,16 @@ augmentations = [
 
 normalizations = [
     NormalizeSampled(
-        keys=source_channel + target_channel,
+        keys=source_channel,
         level="fov_statistics",
         subtrahend="mean",
         divisor="std",
+    ),
+    NormalizeSampled(
+        keys=target_channel,
+        level="fov_statistics",
+        subtrahend="median",
+        divisor="iqr",
     )
 ]
 
@@ -616,8 +641,7 @@ log_batch_jupyter(augmented_batch)
 
 # %% [markdown] tags=[]
 # ## Train a 2D U-Net model to predict nuclei and membrane from phase.
-
-### Constructing a 2D UNeXt2 using VisCy
+# ### Constructing a 2D UNeXt2 using VisCy
 # %% [markdown]
 # <div class="alert alert-info">
 #
@@ -637,7 +661,7 @@ log_batch_jupyter(augmented_batch)
 # Create a 2D UNet.
 GPU_ID = 0
 
-BATCH_SIZE = 12
+BATCH_SIZE = 16
 YX_PATCH_SIZE = (256, 256)
 
 # #######################
@@ -663,7 +687,7 @@ phase2fluor_model = VSUNet(
     model_config=phase2fluor_config.copy(),
     loss_function=MixedLoss(l1_alpha=0.5, l2_alpha=0.0, ms_dssim_alpha=0.5),
     schedule="WarmupCosine",
-    lr=2e-4,
+    lr=6e-4,
     log_batches_per_epoch=5,  # Number of samples from each batch to log to tensorboard.
     freeze_encoder=False,
 )
@@ -691,7 +715,7 @@ phase2fluor_2D_data = HCSDataModule(
 )
 phase2fluor_2D_data.setup("fit")
 # fast_dev_run runs a single batch of data through the model to check for errors.
-trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID], fast_dev_run=True)
+trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID], precision='16-mixed' ,fast_dev_run=True)
 
 # trainer class takes the model and the data module as inputs.
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
@@ -702,7 +726,7 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 # Here we are creating a 2D UNet.
 GPU_ID = 0
 
-BATCH_SIZE = 12
+BATCH_SIZE = 16
 YX_PATCH_SIZE = (256, 256)
 
 # Dictionary that specifies key parameters of the model.
@@ -725,7 +749,7 @@ phase2fluor_model = VSUNet(
     model_config=phase2fluor_config.copy(),
     loss_function=MixedLoss(l1_alpha=0.5, l2_alpha=0.0, ms_dssim_alpha=0.5),
     schedule="WarmupCosine",
-    lr=2e-4,
+    lr=6e-4,
     log_batches_per_epoch=5,  # Number of samples from each batch to log to tensorboard.
     freeze_encoder=False,
 )
@@ -752,7 +776,7 @@ phase2fluor_2D_data = HCSDataModule(
 )
 phase2fluor_2D_data.setup("fit")
 # fast_dev_run runs a single batch of data through the model to check for errors.
-trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID], fast_dev_run=True)
+trainer = VSTrainer(accelerator="gpu", devices=[GPU_ID],precision='16-mixed', fast_dev_run=True)
 
 # trainer class takes the model and the data module as inputs.
 trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
@@ -812,12 +836,13 @@ GPU_ID = 0
 
 n_samples = len(phase2fluor_2D_data.train_dataset)
 steps_per_epoch = n_samples // BATCH_SIZE  # steps per epoch.
-n_epochs = 25  # Set this to 25-30 or the number of epochs you want to train for.
+n_epochs = 80  # Set this to 80-100 or the number of epochs you want to train for.
 
 trainer = VSTrainer(
     accelerator="gpu",
     devices=[GPU_ID],
     max_epochs=n_epochs,
+    precision='16-mixed',
     log_every_n_steps=steps_per_epoch // 2,
     # log losses and image samples 2 times per epoch.
     logger=TensorBoardLogger(
@@ -847,7 +872,7 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 
 # </div>
 # %% [markdown] tags=[]
-# ## Part 2: Assess your trained model
+# # Part 2: Assess your trained model
 
 # Now we will look at some metrics of performance of previous model.
 # We typically evaluate the model performance on a held out test data.
@@ -883,13 +908,13 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 
 # %% [markdown] tags=[]
 # ### Let's compute metrics directly and plot below.
-#%% [markdown] tags=[]
+# %% [markdown] tags=[]
 # <div class="alert alert-danger">
 # If you weren't able to train or training didn't complete please run the following lines to load the latest checkpoint <br>
 # 
 # ```python
 # phase2fluor_model_ckpt = natsorted(glob(
-#    str(top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
+#    str(top_dir / "06_image_translation/logs/phase2fluor/version*/checkpoints/*.ckpt")
 # ))[-1]
 #```
 #<br>
@@ -898,13 +923,33 @@ trainer.fit(phase2fluor_model, datamodule=phase2fluor_2D_data)
 # 
 #```python
 #phase2fluor_model_ckpt = natsorted(glob(
-#  str(top_dir/"06_image_translation/backup/phase2fluor/version_3/checkpoints/*.ckpt")
+#  str(top_dir/"06_image_translation/backup/phase2fluor/version_0/checkpoints/*.ckpt")
 #))[-1]
+#```
+
+#```python
+#phase2fluor_config = dict(
+#     in_channels=1,
+#     out_channels=2,
+#     encoder_blocks=[3, 3, 9, 3],
+#     dims=[96, 192, 384, 768],
+#     decoder_conv_blocks=2,
+#     stem_kernel_size=(1, 2, 2),
+#     in_stack_depth=1,
+#     pretraining=False,
+# )
+# Load the model checkpoint
+# phase2fluor_model = VSUNet.load_from_checkpoint(
+#     phase2fluor_model_ckpt,
+#     architecture="UNeXt2_2D",
+#     model_config = phase2fluor_config,
+#     accelerator='gpu'
+# )
 #````
 # </div>
 # %%
 # Setup the test data module.
-test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
+test_data_path = top_dir / "06_image_translation/test/a549_hoechst_cellmask_test.zarr"
 source_channel = ["Phase3D"]
 target_channel = ["Nucl", "Mem"]
 
@@ -923,7 +968,7 @@ test_metrics = pd.DataFrame(
     columns=["pearson_nuc", "SSIM_nuc", "pearson_mem", "SSIM_mem"]
 )
 
-#%%
+# %%
 # Compute metrics directly and plot here.
 def normalize_fov(input:ArrayLike):
     "Normalizing the fov with zero mean and unit variance"
@@ -966,7 +1011,7 @@ test_metrics.boxplot(
     rot=30,
 )
 
-#%%
+# %%
 # Adjust the image to the 0.5-99.5 percentile range.
 def process_image(image):
     p_low, p_high = np.percentile(image, (0.5, 99.5))
@@ -1003,8 +1048,14 @@ for i, sample in enumerate(test_data.test_dataloader()):
     target_membrane = process_image(target_image[1,0])
        # Concatenate all images side by side
     combined_image = np.concatenate(
-        (phase_raw, predicted_nuclei, predicted_membrane, target_nuclei, target_membrane),
-        axis=1
+        (
+            phase_raw, 
+            predicted_nuclei,
+            predicted_membrane,
+            target_nuclei,
+            target_membrane
+        ),
+        axis=1,
     )
 
     # Plot the phase,target nuclei, target membrane, predicted nuclei, predicted membrane
@@ -1023,7 +1074,7 @@ for i, sample in enumerate(test_data.test_dataloader()):
 # Here we will compare your model with the VSCyto2D pretrained model by computing the pixel-based metrics and segmentation-based metrics.
 #
 # <ul>
-# <li>When you ran the `setup.sh` you also downloaded the models in `/06_image_translation/part1/pretrained_models/VSCyto2D/*.ckpt`</li>
+# <li>When you ran the `setup.sh` you also downloaded the models in `/06_image_translation/pretrained_models/VSCyto2D/*.ckpt`</li>
 # <li>Load the <b>VSCyto2 model</b> model checkpoint and the configuration file</li>
 # <li>Compute the pixel-based metrics and segmentation-based metrics between the model you trained and the pretrained model</li>
 # </ul>
@@ -1040,7 +1091,7 @@ for i, sample in enumerate(test_data.test_dataloader()):
 pretrained_model_ckpt = top_dir/...## Add the path to the "VSCyto2D/epoch=399-step=23200.ckpt"
 
 # TODO: Load the phase2fluor_config just like the model you trained
-phase2fluor_config = dict() ##
+phase2fluor_config = dict()  ##
 
 # TODO: Load the checkpoint. Write the architecture name. HINT: look at the previous config.
 pretrained_phase2fluor = VSUNet.load_from_checkpoint(
@@ -1055,7 +1106,7 @@ pretrained_phase2fluor = VSUNet.load_from_checkpoint(
 # #######################
 
 pretrained_model_ckpt = (
-    top_dir / "06_image_translation/part1/pretrained_models/VSCyto2D/epoch=399-step=23200.ckpt"
+    top_dir / "06_image_translation/pretrained_models/VSCyto2D/epoch=399-step=23200.ckpt"
 )
 
 phase2fluor_config = dict(
@@ -1079,15 +1130,14 @@ pretrained_phase2fluor.eval()
 ### Re-load your trained model
 # NOTE: assuming the latest checkpoint it your latest training and model
 phase2fluor_model_ckpt = natsorted(glob(
-    str(training_top_dir / "06_image_translation/part1/logs/phase2fluor/version*/checkpoints/*.ckpt")
+    str(training_top_dir / "06_image_translation/logs/phase2fluor/version*/checkpoints/*.ckpt")
 ))[-1]
 
 # NOTE: if their model didn't go past epoch 5, lost their checkpoint, or didnt train anything. 
 # Uncomment the next lines
 #phase2fluor_model_ckpt = natsorted(glob(
-#  str(top_dir/"06_image_translation/backup/phase2fluor/version_3/checkpoints/*.ckpt")
+#  str(top_dir/"06_image_translation/backup/phase2fluor/version_0/checkpoints/*.ckpt")
 #))[-1]
-
 
 phase2fluor_config = dict(
     in_channels=1,
@@ -1107,7 +1157,7 @@ phase2fluor_model = VSUNet.load_from_checkpoint(
     accelerator='gpu'
 )
 phase2fluor_model.eval()
-#%% [markdown] tags=[]
+# %% [markdown] tags=[]
 # <div class="alert alert-warning">
 # <h3> Question </h3> 
 # 1. Can we evaluate a model's performance based on their segmentations?<br>
@@ -1115,7 +1165,7 @@ phase2fluor_model.eval()
 # We will evaluate the performance of your trained model with a pre-trained model using pixel based metrics as above and
 # segmantation based metrics including (mAP@0.5, dice, accuracy and jaccard index). <br>
 # </div>
-#%% [markdown] tags=["solution"]
+# %% [markdown] tags=["solution"]
 #
 # - <b> IoU (Intersection over Union): </b> Also referred to as the Jaccard index, is essentially a method to quantify the percent overlap between the target and predicted masks. 
 # It is calculated as the intersection of the target and predicted masks divided by the union of the target and predicted masks. <br>
@@ -1162,8 +1212,8 @@ def cellpose_segmentation(prediction:ArrayLike,target:ArrayLike)->Tuple[torch.Sh
 
 # %%
 # Setting the paths for the test data and the output segmentation
-test_data_path = top_dir / "06_image_translation/part1/test/a549_hoechst_cellmask_test.zarr"
-output_segmentation_path= training_top_dir /"06_image_translation/part1/pretrained_model_segmentations.zarr"
+test_data_path = top_dir / "06_image_translation/test/a549_hoechst_cellmask_test.zarr"
+output_segmentation_path= training_top_dir /"06_image_translation/pretrained_model_segmentations.zarr"
 
 # Creating the dataframes to store the pixel and segmentation metrics
 test_pixel_metrics = pd.DataFrame(
@@ -1359,8 +1409,8 @@ test_dataset.close()
 segmentation_store.close()
 # %%
 # Save the test metrics into a dataframe
-pixel_metrics_path = training_top_dir/"06_image_translation/part1/VS_metrics_pixel_part_1.csv"
-segmentation_metrics_path = training_top_dir/"06_image_translation/part1/VS_metrics_segments_part_1.csv"
+pixel_metrics_path = training_top_dir/"06_image_translation/VS_metrics_pixel.csv"
+segmentation_metrics_path = training_top_dir/"06_image_translation/VS_metrics_segments.csv"
 test_pixel_metrics.to_csv(pixel_metrics_path)
 test_segmentation_metrics.to_csv(segmentation_metrics_path)
 
@@ -1402,18 +1452,24 @@ plt.suptitle("Model Segmentation Metrics")
 plt.show()
 
 # %% [markdown] tags=["task"]
-# ########## TODO ##############
-# - What do these metrics tells us about the performance of the model?
-# - How do you interpret the differences in the metrics between the models?
-# - How is your model compared to the pretrained model? How can you improve it?
+# <div class="alert alert-warning">
+# <h3>Questions</h3>
+# <ul>
+# <li> What do these metrics tells us about the performance of the model? </li>
+# <li> How do you interpret the differences in the metrics between the models? </li>
+# <li> How is your model compared to the pretrained model? How can you improve it? </li>
+# </ul>
+# </div>
 
 # %% [markdown]
 # <div class="alert alert-info">
 #
 # ### Plotting the predictions and segmentations
 # Here we will plot the predictions and segmentations side by side for the pretrained and trained models.<br>
-# - How do yout model, the pretrained model and the ground truth compare?<br>
-# - How do the segmentations compare? <br>
+# <ul>
+# <li>How do yout model, the pretrained model and the ground truth compare?</li>
+# <li>How do the segmentations compare? </li>
+# </ul>
 # Feel free to modify the crop size and Y,X slicing to view different areas of the FOV
 # </div>
 # %% tags=["task"]
@@ -1470,15 +1526,552 @@ for ax in axs.flat:
 plt.tight_layout()
 plt.show()
 
+
+# %% [markdown] tags=[]
+# <div class="alert alert-success">
+
+# <h2> Checkpoint 2 </h2>
+#
+# Congratulations! You have completed the second checkpoint. You have:
+# - Visualized the predictions and segmentations of the model. <br>
+# - Evaluated the performance of the model using pixel-based metrics and segmentation-based metrics. <br>
+# - Compared the performance of the model you trained with the pretrained model. <br>
+# 
+# </div>
+
+#%% [markdown] tags=[]
+# # Part 3: Visualizing the encoder and decoder features & exploring the model's range of validity
+# 
+# - In this section, we will visualize the encoder and decoder features of the model you trained.
+# - We will also explore the model's range of validity by looking at the feature maps of the encoder and decoder.
+#
+# %% [markdown] tags=[]
+# <div class="alert alert-info">
+# <h3> Task 3.1: Let's look at what the model is learning </h3>
+# 
+# - If you are unfamiliar with Principal Component Analysis (PCA), you can read up <a href="https://en.wikipedia.org/wiki/Principal_component_analysis">here</a> <br>
+# - Run the next cells. We will visualize the encoder feature maps of the trained model.
+#  We will use PCA to visualize the feature maps by mapping the first 3 principal components to a colormap `Color` <br>
+# 
+# 
+# </div>
+
+# %%
+"""
+Script to visualize the encoder feature maps of a trained model.
+Using PCA to visualize feature maps is inspired by
+https://doi.org/10.48550/arXiv.2304.07193 (Oquab et al., 2023).
+"""
+from typing import NamedTuple
+
+from matplotlib.patches import Rectangle
+from monai.networks.layers import GaussianFilter
+from skimage.exposure import rescale_intensity
+from skimage.transform import downscale_local_mean
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+
+
+def feature_map_pca(feature_map: np.array, n_components: int = 8) -> PCA:
+    """
+    Compute PCA on a feature map.
+    :param np.array feature_map: (C, H, W) feature map
+    :param int n_components: number of components to keep
+    :return: PCA: fit sklearn PCA object
+    """
+    # (C, H, W) -> (C, H*W)
+    feat = feature_map.reshape(feature_map.shape[0], -1)
+    pca = PCA(n_components=n_components)
+    pca.fit(feat)
+    return pca
+
+def pcs_to_rgb(feat: np.ndarray, n_components: int = 8) -> np.ndarray:
+    pca = feature_map_pca(feat[0], n_components=n_components)
+    pc_first_3 = pca.components_[:3].reshape(3, *feat.shape[-2:])
+    return np.stack(
+        [rescale_intensity(pc, out_range=(0, 1)) for pc in pc_first_3], axis=-1
+    )
+# %%
+# Load the test dataset
+test_data_path = top_dir / "06_image_translation/test/a549_hoechst_cellmask_test.zarr"
+test_dataset = open_ome_zarr(test_data_path)
+
+# Looking at the test dataset
+print('Test dataset:')
+test_dataset.print_tree()
+
+# %% [markdown] tags=[]
+# <div class="alert alert-info">
+#
+# - Change the `fov` and `crop` size to visualize the feature maps of the encoder and decoder  <br>
+# Note: the crop should be a multiple of 384
+# </div>
+#%%
+# Load one position
+row = 0
+col = 0
+center_index = 2
+n = 1
+crop = 384 * n
+fov = 10
+
+# normalize phase
+norm_meta = test_dataset.zattrs["normalization"]["Phase3D"]["dataset_statistics"]
+
+# Get the OME-Zarr metadata
+Y,X = test_dataset[f"0/0/{fov}"].data.shape[-2:]
+test_dataset.channel_names
+phase_idx= test_dataset.channel_names.index('Phase3D')
+assert crop//2 < Y and crop//2 < Y , "Crop size larger than the image. Check the image shape"
+
+phase_img = test_dataset[f"0/0/{fov}/0"][:, phase_idx:phase_idx+1,0:1, Y//2 - crop // 2 : Y//2 + crop // 2, X//2 - crop // 2 : X//2 + crop // 2]
+fluo = test_dataset[f"0/0/{fov}/0"][0, 1:3, 0, Y//2 - crop // 2 : Y//2 + crop // 2, X//2 - crop // 2 : X//2 + crop // 2]
+
+phase_img = (phase_img - norm_meta["median"]) / norm_meta["iqr"]
+plt.imshow(phase_img[0,0,0], cmap="gray")
+
+# %% [markdown] tags=[]
+# <div class="alert alert-info">
+# For the following tasks we will use the pretrained model to extract the encoder and decoder features <br>
+# Extra: If you are done with the whole checkpoint, you can try to look at what your trained model learned.
+# </div>
+# %%
+
+# Loading the pretrained model
+pretrained_model_ckpt = (
+    top_dir / "06_image_translation/pretrained_models/VSCyto2D/epoch=399-step=23200.ckpt"
+)
+# model config as before
+phase2fluor_config = dict(
+    in_channels=1,
+    out_channels=2,
+    encoder_blocks=[3, 3, 9, 3],
+    dims=[96, 192, 384, 768],
+    decoder_conv_blocks=2,
+    stem_kernel_size=(1, 2, 2),
+    in_stack_depth=1,
+    pretraining=False,
+)
+
+# load model
+model = VSUNet.load_from_checkpoint(
+    pretrained_model_ckpt,
+    architecture="UNeXt2_2D",
+    model_config=phase2fluor_config.copy(),
+    accelerator="gpu",
+)
+
+# %% tags=[]
+# Extract features
+with torch.inference_mode():
+    # encoder
+    encoder_features = model.model.encoder(torch.from_numpy(phase_img.astype(np.float32)).to(model.device))[0]
+    encoder_features_np = [f.detach().cpu().numpy() for f in encoder_features]
+    
+    # Print the encoder features shapes
+    for f in encoder_features_np:
+        print(f.shape)
+
+    # decoder
+    features = encoder_features.copy()
+    features.reverse()
+    feat = features[0]
+    features.append(None)
+    decoder_features_np = []
+    for skip, stage in zip(features[1:], model.model.decoder.decoder_stages):
+        feat = stage(feat, skip)
+        decoder_features_np.append(feat.detach().cpu().numpy())
+    for f in decoder_features_np:
+        print(f.shape)
+    prediction = model.model.head(feat).detach().cpu().numpy()
+    
+# Defining the colors for plotting
+class Color(NamedTuple):
+    r: float
+    g: float
+    b: float
+# Defining the colors for plottting the PCA
+BOP_ORANGE = Color(0.972549, 0.6784314, 0.1254902)
+BOP_BLUE = Color(BOP_ORANGE.b, BOP_ORANGE.g, BOP_ORANGE.r)
+GREEN = Color(0.0, 1.0, 0.0)
+MAGENTA = Color(1.0, 0.0, 1.0)
+
+# Defining the functions to rescale the image and composite the nuclear and membrane images
+def rescale_clip(image: torch.Tensor) -> np.ndarray:
+    return rescale_intensity(image, out_range=(0, 1))[..., None].repeat(3, axis=-1)
+
+def composite_nuc_mem(
+    image: torch.Tensor, nuc_color: Color, mem_color: Color
+) -> np.ndarray:
+    c_nuc = rescale_clip(image[0]) * nuc_color
+    c_mem = rescale_clip(image[1]) * mem_color
+    return rescale_intensity(c_nuc + c_mem, out_range=(0, 1))
+
+def clip_p(image: np.ndarray) -> np.ndarray:
+    return rescale_intensity(image.clip(*np.percentile(image, [1, 99])))
+
+def clip_highlight(image: np.ndarray) -> np.ndarray:
+    return rescale_intensity(image.clip(0, np.percentile(image, 99.5)))
+
+# Plot the PCA to RGB of the feature maps
+f, ax = plt.subplots(10, 1, figsize=(5, 25))
+n_components = 4
+ax[0].imshow(phase_img[0, 0, 0], cmap="gray")
+ax[0].set_title(f"Phase {phase_img.shape[1:]}")
+ax[-1].imshow(clip_p(composite_nuc_mem(fluo, GREEN, MAGENTA)))
+ax[-1].set_title("Fluorescence")
+
+for level, feat in enumerate(encoder_features_np):
+    ax[level + 1].imshow(pcs_to_rgb(feat, n_components=n_components))
+    ax[level + 1].set_title(f"Encoder stage {level+1} {feat.shape[1:]}")
+
+for level, feat in enumerate(decoder_features_np):
+    ax[5 + level].imshow(pcs_to_rgb(feat, n_components=n_components))
+    ax[5 + level].set_title(f"Decoder stage {level+1} {feat.shape[1:]}")
+
+pred_comp = composite_nuc_mem(prediction[0, :, 0], BOP_BLUE, BOP_ORANGE)
+ax[-2].imshow(clip_p(pred_comp))
+ax[-2].set_title(f"Prediction {prediction.shape[1:]}")
+
+for a in ax.ravel():
+    a.axis("off")
+plt.tight_layout()
+
+# %% [markdown] tags=["task"]
+# <div class="alert alert-info">
+# 
+# ### Task 3.2: Select a sample batch to test the range of validty of the model
+# - Run the next cell to setup the your dataloader for `test` <br>
+# - Select a test batch from the `test_dataloader` by changing the `batch_number` <br>
+# - Examine the plot of the source and target images of the batch <br>
+#
+# <b> Note the 2D images have different focus </b> <br>
+# </div>
+
+# %%
+YX_PATCH_SIZE = (256*2,256*2)
+source_channel = ["Phase3D"]
+target_channel = ["Nucl", "Mem"]
+
+normalizations = [
+    NormalizeSampled(
+        keys=source_channel,
+        level="fov_statistics",
+        subtrahend="mean",
+        divisor="std",
+    ),
+        NormalizeSampled(
+        keys=target_channel,
+        level="fov_statistics",
+        subtrahend="median",
+        divisor="iqr",
+    )
+]
+
+# Re-load the dataloader
+phase2fluor_2D_data = HCSDataModule(
+    data_path,
+    architecture="UNeXt2_2D",
+    source_channel=source_channel,
+    target_channel=target_channel,
+    z_window_size=1,
+    split_ratio=0.8,
+    batch_size=1,
+    num_workers=8,
+    yx_patch_size=YX_PATCH_SIZE,
+    augmentations=[],
+    normalizations=normalizations,
+)
+phase2fluor_2D_data.setup("test")
+# %% tags=[]
+# ########## TODO ##############
+batch_number = 3 # Change this to see different batches of data
+# #######################
+y_slice = slice(Y//2-256*n//2, Y//2+256*n//2)
+x_slice = slice(X//2-256*n//2, X//2+256*n//2)
+
+# Iterate through the test dataloader to get the desired batch
+i = 0
+for batch in phase2fluor_2D_data.test_dataloader():
+    # break if we reach the desired batch    
+    if i == batch_number-1:
+        break
+    i += 1
+
+# Plot the batch source and target images
+f, ax = plt.subplots(1, 2, figsize=(8, 12))
+target_composite = composite_nuc_mem(batch["target"][0].cpu().numpy(), GREEN, MAGENTA)
+ax[0].imshow(
+    batch["source"][0, 0, 0,y_slice,x_slice].cpu().numpy(), cmap="gray", vmin=-15, vmax=15
+)
+ax[1].imshow(clip_highlight(target_composite[0,y_slice,x_slice]))
+for a in ax.ravel():
+    a.axis("off")
+f.tight_layout()
+plt.show()
+
+# %% [markdown] tags=[]
+# <div class="alert alert-info">
+# 
+# ### Task 3.3: Using the selected batch to test the model's range of validity
+#
+# - Given the selected batch use `monai.networks.layers.GaussianFilter` to blur the images with different sigmas.
+#  Check the documentation <a href="https://docs.monai.io/en/stable/networks.html#gaussianfilter">here</a> <br>
+# - Plot the source and predicted images comparing the source, target and added perturbations <br>
+# - How is the model's predictions given the perturbations? <br>
+# </div>
+# %% tags=["task"]
+# ########## TODO ##############
+# Try out different multiples of 256 to visualize larger/smaller crops
+n = 3
+# ##############################
+# Center cropping the image
+y_slice = slice(Y//2-256*n//2, Y//2+256*n//2)
+x_slice = slice(X//2-256*n//2, X//2+256*n//2)
+
+f, ax = plt.subplots(3, 2, figsize=(8, 12))
+
+target_composite = composite_nuc_mem(batch["target"][0].cpu().numpy(), GREEN, MAGENTA)
+ax[0, 0].imshow(
+    batch["source"][0, 0, 0,y_slice,x_slice].cpu().numpy(), cmap="gray", vmin=-15, vmax=15
+)
+ax[0, 1].imshow(clip_highlight(target_composite[0,y_slice,x_slice]))
+ax[0,0].set_title('Source and target')
+
+# no perturbation
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[1, 0].imshow(phase[0,0,0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[1, 1].imshow(pred_composite[0])
+ax[1,0].set_title('No perturbation')
+
+# Select a sigma for the Gaussian filtering
+# ########## TODO ##############
+# Tensor dimensions (B,C,D,H,W). 
+# Hint: Use the GaussianFilter layer to blur the phase image. Provide the  num spatial dimensions and sigmas
+# Hint: Spatial (D,H,W)
+gaussian_blur = GaussianFilter(....)
+# #############################
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    phase = gaussian_blur(phase)
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[2, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[2, 1].imshow(pred_composite[0])
+
+# %% tags=["solution"]
+# ########## SOLUTION ##############
+# Try out different multiples of 256 to visualize larger/smaller crops
+n = 3
+# ##############################
+# Center cropping the image
+y_slice = slice(Y//2-256*n//2, Y//2+256*n//2)
+x_slice = slice(X//2-256*n//2, X//2+256*n//2)
+
+f, ax = plt.subplots(3, 2, figsize=(8, 12))
+
+target_composite = composite_nuc_mem(batch["target"][0].cpu().numpy(), GREEN, MAGENTA)
+ax[0, 0].imshow(
+    batch["source"][0, 0, 0,y_slice,x_slice].cpu().numpy(), cmap="gray", vmin=-15, vmax=15
+)
+ax[0, 1].imshow(clip_highlight(target_composite[0,y_slice,x_slice]))
+ax[0,0].set_title('Source and target')
+
+# no perturbation
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[1, 0].imshow(phase[0,0,0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[1, 1].imshow(pred_composite[0])
+ax[1,0].set_title('No perturbation')
+
+
+# Select a sigma for the Gaussian filtering
+# ########## SOLUTION ##############
+# Tensor dimensions (B,C,D,H,W). 
+# Hint: Use the GaussianFilter layer to blur the phase image. Provide the  num spatial dimensions and sigma
+# Hint: Spatial (D,H,W). Apply the same sigma to H,W
+gaussian_blur = GaussianFilter(spatial_dims=3, sigma=(0,2,2))
+# #############################
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    phase = gaussian_blur(phase)
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[2, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[2, 1].imshow(pred_composite[0])
+
+# %% [markdown] tags=[]
+# <div class="alert alert-info">
+# 
+# ### Task 3.3: Using the selected batch to test the model's range of validity
+#
+# - Scale the pixel values up/down of the phase image <br>
+# - Plot the source and predicted images comparing the source, target and added perturbations <br>
+# - How is the model's predictions given the perturbations? <br>
+# </div>
+
+# %% tags=["task"]
+n = 3
+y_slice = slice(Y//2, Y//2+256*n)
+x_slice = slice(X//2, X//2+256*n)
+f, ax = plt.subplots(3, 2, figsize=(8, 12))
+
+target_composite = composite_nuc_mem(batch["target"][0].cpu().numpy(), GREEN, MAGENTA)
+ax[0, 0].imshow(
+    batch["source"][0, 0, 0,y_slice,x_slice].cpu().numpy(), cmap="gray", vmin=-15, vmax=15
+)
+ax[0, 1].imshow(clip_highlight(target_composite[0,y_slice,x_slice]))
+ax[0,0].set_title('Source and target')
+
+# no perturbation
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[1, 0].imshow(phase[0,0,0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[1, 1].imshow(pred_composite[0])
+ax[1,0].set_title('No perturbation')
+
+
+# 2-sigma gaussian blur
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    # ########## TODO ##############
+    # Hint: Scale the phase intensity 
+    phase = phase * ......
+    # #######################
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[2, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[2, 1].imshow(pred_composite[0])
+
+# %% tags=["solution"]
+n = 3
+y_slice = slice(Y//2, Y//2+256*n)
+x_slice = slice(X//2, X//2+256*n)
+f, ax = plt.subplots(3, 2, figsize=(8, 12))
+
+target_composite = composite_nuc_mem(batch["target"][0].cpu().numpy(), GREEN, MAGENTA)
+ax[0, 0].imshow(
+    batch["source"][0, 0, 0,y_slice,x_slice].cpu().numpy(), cmap="gray", vmin=-15, vmax=15
+)
+ax[0, 1].imshow(clip_highlight(target_composite[0,y_slice,x_slice]))
+ax[0,0].set_title('Source and target')
+
+# no perturbation
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[1, 0].imshow(phase[0,0,0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[1, 1].imshow(pred_composite[0])
+ax[1,0].set_title('No perturbation')
+
+
+# 2-sigma gaussian blur
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    # ########## SOLUTION ##############
+    # Hint: Scale the phase intensity 
+    phase = phase * 10
+    # #######################
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[2, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[2, 1].imshow(pred_composite[0])
+
+# %% [markdown]
+# <div class="alert alert-warning">
+# <h3> Questions </h3>
+# How is the model's predictions given the blurring and scaling perturbations? <br>
+# </div>
+
+# %% tags=["solution"]
+# ########## SOLUTIONS FOR ALL POSSIBLE PLOTTINGS ##############
+# This plots all perturbations
+
+n = 3
+y_slice = slice(Y//2, Y//2+256*n)
+x_slice = slice(X//2, X//2+256*n)
+f, ax = plt.subplots(6, 2, figsize=(8, 12))
+
+target_composite = composite_nuc_mem(batch["target"][0].cpu().numpy(), GREEN, MAGENTA)
+ax[0, 0].imshow(
+    batch["source"][0, 0, 0,y_slice,x_slice].cpu().numpy(), cmap="gray", vmin=-15, vmax=15
+)
+ax[0, 1].imshow(clip_highlight(target_composite[0,y_slice,x_slice]))
+ax[0,0].set_title('Source and target')
+
+# no perturbation
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[1, 0].imshow(phase[0,0,0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[1, 1].imshow(pred_composite[0])
+ax[1,0].set_title('No perturbation')
+
+
+# 2-sigma gaussian blur
+gaussian_blur = GaussianFilter(spatial_dims=3, sigma=(0,2,2))
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    phase = gaussian_blur(phase)
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[2, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[2, 1].imshow(pred_composite[0])
+ax[2,0].set_title('Gaussian Blur Sigma=2')
+
+
+# 5-sigma gaussian blur
+gaussian_blur = GaussianFilter(spatial_dims=3, sigma=(0,5,5))
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    phase = gaussian_blur(phase)
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[3, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[3, 1].imshow(pred_composite[0])
+ax[3,0].set_title('Gaussian Blur Sigma=5')
+
+
+# 0.1x scaling
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    phase = phase*0.1
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[4, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[4, 1].imshow(pred_composite[0])
+ax[4,0].set_title('0.1x scaling')
+
+# 10x scaling
+with torch.inference_mode():
+    phase = batch["source"].to(model.device)[:,:,:,y_slice,x_slice]
+    phase = phase* 10 
+    pred = model(phase).cpu().numpy()
+pred_composite = composite_nuc_mem(pred[0], BOP_BLUE, BOP_ORANGE)
+ax[5, 0].imshow(phase[0, 0, 0].cpu().numpy(), cmap="gray", vmin=-15, vmax=15)
+ax[5, 1].imshow(pred_composite[0])
+ax[5,0].set_title('10x scaling')
+
+for a in ax.ravel():
+    a.axis("off")
+
+f.tight_layout()
 # %% [markdown] tags=[]
 # <div class="alert alert-success">
 
 # <h2>
 # 🎉 The end of the notebook 🎉
-# Continue to Part 2: Image translation with generative models.
 # </h2>
 
-# Congratulations! You have trained an image translation model and evaluated its performance.
-# </div>
+# Congratulations! You have trained an image translation model, evaluated its performance, and explored what the network has learned. 
 
-# %%
+# </div>
